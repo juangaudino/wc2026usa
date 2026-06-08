@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as TSlugRouteImport } from './routes/t.$slug'
 import { Route as AdminThemesRouteImport } from './routes/admin.themes'
 import { Route as AdminTournamentIdRouteImport } from './routes/admin.tournament.$id'
 
@@ -22,6 +23,11 @@ const IndexRoute = IndexRouteImport.update({
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TSlugRoute = TSlugRouteImport.update({
+  id: '/t/$slug',
+  path: '/t/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminThemesRoute = AdminThemesRouteImport.update({
@@ -38,12 +44,14 @@ const AdminTournamentIdRoute = AdminTournamentIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin/themes': typeof AdminThemesRoute
+  '/t/$slug': typeof TSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/tournament/$id': typeof AdminTournamentIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin/themes': typeof AdminThemesRoute
+  '/t/$slug': typeof TSlugRoute
   '/admin': typeof AdminIndexRoute
   '/admin/tournament/$id': typeof AdminTournamentIdRoute
 }
@@ -51,20 +59,33 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin/themes': typeof AdminThemesRoute
+  '/t/$slug': typeof TSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/tournament/$id': typeof AdminTournamentIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin/themes' | '/admin/' | '/admin/tournament/$id'
+  fullPaths:
+    | '/'
+    | '/admin/themes'
+    | '/t/$slug'
+    | '/admin/'
+    | '/admin/tournament/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin/themes' | '/admin' | '/admin/tournament/$id'
-  id: '__root__' | '/' | '/admin/themes' | '/admin/' | '/admin/tournament/$id'
+  to: '/' | '/admin/themes' | '/t/$slug' | '/admin' | '/admin/tournament/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin/themes'
+    | '/t/$slug'
+    | '/admin/'
+    | '/admin/tournament/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminThemesRoute: typeof AdminThemesRoute
+  TSlugRoute: typeof TSlugRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminTournamentIdRoute: typeof AdminTournamentIdRoute
 }
@@ -83,6 +104,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/t/$slug': {
+      id: '/t/$slug'
+      path: '/t/$slug'
+      fullPath: '/t/$slug'
+      preLoaderRoute: typeof TSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/themes': {
@@ -105,9 +133,20 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminThemesRoute: AdminThemesRoute,
+  TSlugRoute: TSlugRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminTournamentIdRoute: AdminTournamentIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
