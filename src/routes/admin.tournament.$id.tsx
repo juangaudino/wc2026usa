@@ -17,6 +17,7 @@ import { fmtMatchTime, teamMap } from "@/lib/format";
 import {
   getTournamentAdmin, saveTeam, deleteTeam, saveMatch, deleteMatch, addParticipant,
   deleteParticipant, enterResult, updateTournament, previewImport, commitImport, setMatchLock,
+  setBonusAnswers,
 } from "@/lib/api/admin.functions";
 
 export const Route = createFileRoute("/admin/tournament/$id")({
