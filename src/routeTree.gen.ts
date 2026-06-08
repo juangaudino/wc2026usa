@@ -10,33 +10,101 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as TSlugRouteImport } from './routes/t.$slug'
+import { Route as AdminThemesRouteImport } from './routes/admin.themes'
+import { Route as AdminTournamentIdRouteImport } from './routes/admin.tournament.$id'
+import { Route as TSlugMatchMatchIdRouteImport } from './routes/t.$slug.match.$matchId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TSlugRoute = TSlugRouteImport.update({
+  id: '/t/$slug',
+  path: '/t/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminThemesRoute = AdminThemesRouteImport.update({
+  id: '/admin/themes',
+  path: '/admin/themes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminTournamentIdRoute = AdminTournamentIdRouteImport.update({
+  id: '/admin/tournament/$id',
+  path: '/admin/tournament/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TSlugMatchMatchIdRoute = TSlugMatchMatchIdRouteImport.update({
+  id: '/match/$matchId',
+  path: '/match/$matchId',
+  getParentRoute: () => TSlugRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin/themes': typeof AdminThemesRoute
+  '/t/$slug': typeof TSlugRouteWithChildren
+  '/admin/': typeof AdminIndexRoute
+  '/admin/tournament/$id': typeof AdminTournamentIdRoute
+  '/t/$slug/match/$matchId': typeof TSlugMatchMatchIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin/themes': typeof AdminThemesRoute
+  '/t/$slug': typeof TSlugRouteWithChildren
+  '/admin': typeof AdminIndexRoute
+  '/admin/tournament/$id': typeof AdminTournamentIdRoute
+  '/t/$slug/match/$matchId': typeof TSlugMatchMatchIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin/themes': typeof AdminThemesRoute
+  '/t/$slug': typeof TSlugRouteWithChildren
+  '/admin/': typeof AdminIndexRoute
+  '/admin/tournament/$id': typeof AdminTournamentIdRoute
+  '/t/$slug/match/$matchId': typeof TSlugMatchMatchIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/admin/themes'
+    | '/t/$slug'
+    | '/admin/'
+    | '/admin/tournament/$id'
+    | '/t/$slug/match/$matchId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/admin/themes'
+    | '/t/$slug'
+    | '/admin'
+    | '/admin/tournament/$id'
+    | '/t/$slug/match/$matchId'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin/themes'
+    | '/t/$slug'
+    | '/admin/'
+    | '/admin/tournament/$id'
+    | '/t/$slug/match/$matchId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminThemesRoute: typeof AdminThemesRoute
+  TSlugRoute: typeof TSlugRouteWithChildren
+  AdminIndexRoute: typeof AdminIndexRoute
+  AdminTournamentIdRoute: typeof AdminTournamentIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,22 +116,61 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/t/$slug': {
+      id: '/t/$slug'
+      path: '/t/$slug'
+      fullPath: '/t/$slug'
+      preLoaderRoute: typeof TSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/themes': {
+      id: '/admin/themes'
+      path: '/admin/themes'
+      fullPath: '/admin/themes'
+      preLoaderRoute: typeof AdminThemesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/tournament/$id': {
+      id: '/admin/tournament/$id'
+      path: '/admin/tournament/$id'
+      fullPath: '/admin/tournament/$id'
+      preLoaderRoute: typeof AdminTournamentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/t/$slug/match/$matchId': {
+      id: '/t/$slug/match/$matchId'
+      path: '/match/$matchId'
+      fullPath: '/t/$slug/match/$matchId'
+      preLoaderRoute: typeof TSlugMatchMatchIdRouteImport
+      parentRoute: typeof TSlugRoute
+    }
   }
 }
 
+interface TSlugRouteChildren {
+  TSlugMatchMatchIdRoute: typeof TSlugMatchMatchIdRoute
+}
+
+const TSlugRouteChildren: TSlugRouteChildren = {
+  TSlugMatchMatchIdRoute: TSlugMatchMatchIdRoute,
+}
+
+const TSlugRouteWithChildren = TSlugRoute._addFileChildren(TSlugRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminThemesRoute: AdminThemesRoute,
+  TSlugRoute: TSlugRouteWithChildren,
+  AdminIndexRoute: AdminIndexRoute,
+  AdminTournamentIdRoute: AdminTournamentIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
