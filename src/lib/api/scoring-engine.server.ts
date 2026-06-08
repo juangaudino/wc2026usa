@@ -68,7 +68,7 @@ export async function recomputeBonus(admin: Admin, tournamentId: string) {
     .select("bonus_config")
     .eq("id", tournamentId)
     .maybeSingle();
-  const fields = (t?.bonus_config ?? []) as BonusField[];
+  const fields = (t?.bonus_config ?? []) as unknown as BonusField[];
   const byKey = new Map(fields.map((f) => [f.key, f]));
 
   const { data: preds } = await admin
