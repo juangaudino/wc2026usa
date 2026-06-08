@@ -14,6 +14,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as TSlugRouteImport } from './routes/t.$slug'
 import { Route as AdminThemesRouteImport } from './routes/admin.themes'
 import { Route as AdminTournamentIdRouteImport } from './routes/admin.tournament.$id'
+import { Route as TSlugMatchMatchIdRouteImport } from './routes/t.$slug.match.$matchId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -40,28 +41,36 @@ const AdminTournamentIdRoute = AdminTournamentIdRouteImport.update({
   path: '/admin/tournament/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TSlugMatchMatchIdRoute = TSlugMatchMatchIdRouteImport.update({
+  id: '/match/$matchId',
+  path: '/match/$matchId',
+  getParentRoute: () => TSlugRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin/themes': typeof AdminThemesRoute
-  '/t/$slug': typeof TSlugRoute
+  '/t/$slug': typeof TSlugRouteWithChildren
   '/admin/': typeof AdminIndexRoute
   '/admin/tournament/$id': typeof AdminTournamentIdRoute
+  '/t/$slug/match/$matchId': typeof TSlugMatchMatchIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin/themes': typeof AdminThemesRoute
-  '/t/$slug': typeof TSlugRoute
+  '/t/$slug': typeof TSlugRouteWithChildren
   '/admin': typeof AdminIndexRoute
   '/admin/tournament/$id': typeof AdminTournamentIdRoute
+  '/t/$slug/match/$matchId': typeof TSlugMatchMatchIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin/themes': typeof AdminThemesRoute
-  '/t/$slug': typeof TSlugRoute
+  '/t/$slug': typeof TSlugRouteWithChildren
   '/admin/': typeof AdminIndexRoute
   '/admin/tournament/$id': typeof AdminTournamentIdRoute
+  '/t/$slug/match/$matchId': typeof TSlugMatchMatchIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -71,8 +80,15 @@ export interface FileRouteTypes {
     | '/t/$slug'
     | '/admin/'
     | '/admin/tournament/$id'
+    | '/t/$slug/match/$matchId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin/themes' | '/t/$slug' | '/admin' | '/admin/tournament/$id'
+  to:
+    | '/'
+    | '/admin/themes'
+    | '/t/$slug'
+    | '/admin'
+    | '/admin/tournament/$id'
+    | '/t/$slug/match/$matchId'
   id:
     | '__root__'
     | '/'
@@ -80,12 +96,13 @@ export interface FileRouteTypes {
     | '/t/$slug'
     | '/admin/'
     | '/admin/tournament/$id'
+    | '/t/$slug/match/$matchId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminThemesRoute: typeof AdminThemesRoute
-  TSlugRoute: typeof TSlugRoute
+  TSlugRoute: typeof TSlugRouteWithChildren
   AdminIndexRoute: typeof AdminIndexRoute
   AdminTournamentIdRoute: typeof AdminTournamentIdRoute
 }
@@ -127,13 +144,30 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminTournamentIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/t/$slug/match/$matchId': {
+      id: '/t/$slug/match/$matchId'
+      path: '/match/$matchId'
+      fullPath: '/t/$slug/match/$matchId'
+      preLoaderRoute: typeof TSlugMatchMatchIdRouteImport
+      parentRoute: typeof TSlugRoute
+    }
   }
 }
+
+interface TSlugRouteChildren {
+  TSlugMatchMatchIdRoute: typeof TSlugMatchMatchIdRoute
+}
+
+const TSlugRouteChildren: TSlugRouteChildren = {
+  TSlugMatchMatchIdRoute: TSlugMatchMatchIdRoute,
+}
+
+const TSlugRouteWithChildren = TSlugRoute._addFileChildren(TSlugRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminThemesRoute: AdminThemesRoute,
-  TSlugRoute: TSlugRoute,
+  TSlugRoute: TSlugRouteWithChildren,
   AdminIndexRoute: AdminIndexRoute,
   AdminTournamentIdRoute: AdminTournamentIdRoute,
 }
