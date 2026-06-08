@@ -269,7 +269,6 @@ function SettingsPanel({ id, tournament, onDone }: { id: string; tournament: any
 
 function BonusEditor({ id, fields, onDone }: { id: string; fields: any[]; onDone: () => void }) {
   const [rows, setRows] = useState(fields.length ? fields : []);
-  const { setBonusAnswers } = require("@/lib/api/admin.functions");
   const update = (i: number, key: string, val: any) => setRows((r: any[]) => r.map((x, j) => (j === i ? { ...x, [key]: val } : x)));
   return (
     <div className="mt-2 space-y-2">
