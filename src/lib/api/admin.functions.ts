@@ -14,6 +14,51 @@ function emailFromClaims(claims: any): string | null {
   return claims?.email ?? null;
 }
 
+async function clearTournamentTeamsAndMatches(admin: any, baseTournamentId: string) {
+  const { data: matches, error: matchLookupErr } = await admin
+    .from("matches")
+    .select("id")
+    .eq("base_tournament_id", baseTournamentId);
+  if (matchLookupErr) throw new Error(matchLookupErr.message);
+  const matchIds = (matches ?? []).map((m: any) => m.id);
+  if (matchIds.length > 0) {
+    const { error: predErr } = await admin.from("match_predictions").delete().in("match_id", matchIds);
+    if (predErr) throw new Error(predErr.message);
+    const { error: resultErr } = await admin.from("match_results").delete().in("match_id", matchIds);
+    if (resultErr) throw new Error(resultErr.message);
+  }
+  const { error: matchDeleteErr } = await admin
+    .from("matches")
+    .delete()
+    .eq("base_tournament_id", baseTournamentId);
+  if (matchDeleteErr) throw new Error(matchDeleteErr.message);
+  const { error: teamDeleteErr } = await admin
+    .from("teams")
+    .delete()
+    .eq("base_tournament_id", baseTournamentId);
+  if (teamDeleteErr) throw new Error(teamDeleteErr.message);
+}
+
+async function clearTournamentMatches(admin: any, baseTournamentId: string) {
+  const { data: matches, error: matchLookupErr } = await admin
+    .from("matches")
+    .select("id")
+    .eq("base_tournament_id", baseTournamentId);
+  if (matchLookupErr) throw new Error(matchLookupErr.message);
+  const matchIds = (matches ?? []).map((m: any) => m.id);
+  if (matchIds.length > 0) {
+    const { error: predErr } = await admin.from("match_predictions").delete().in("match_id", matchIds);
+    if (predErr) throw new Error(predErr.message);
+    const { error: resultErr } = await admin.from("match_results").delete().in("match_id", matchIds);
+    if (resultErr) throw new Error(resultErr.message);
+  }
+  const { error: matchDeleteErr } = await admin
+    .from("matches")
+    .delete()
+    .eq("base_tournament_id", baseTournamentId);
+  if (matchDeleteErr) throw new Error(matchDeleteErr.message);
+}
+
 /* ----------------------------- ACCOUNT ----------------------------- */
 export const getMyAccount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
