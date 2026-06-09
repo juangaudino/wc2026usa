@@ -800,6 +800,19 @@ export const ownerImportTeams = createServerFn({ method: "POST" })
     const { assertOwner } = await import("./authz.server");
     await assertOwner(admin, context.userId);
 
+    const seenCodes = new Set<string>();
+    const groupCounts = new Map<string, number>();
+    for (const t of data.teams) {
+      const code = t.short_code.trim().toLowerCase();
+      if (seenCodes.has(code)) throw new Error(`Duplicate team code: ${t.short_code}`);
+      seenCodes.add(code);
+      const group = t.group_name?.trim();
+      if (group) groupCounts.set(group, (groupCounts.get(group) ?? 0) + 1);
+    }
+    for (const [group, count] of groupCounts) {
+      if (count > 4) throw new Error(`Group ${group} has ${count} teams. World Cup groups can have at most 4.`);
+    }
+
     await clearTournamentTeamsAndMatches(admin, data.baseTournamentId);
 
     const byCode = new Map(
@@ -868,6 +881,20 @@ export const ownerImportMatches = createServerFn({ method: "POST" })
     const teamByCode = new Map(
       (teams ?? []).map((t: any) => [String(t.short_code).toLowerCase(), t.id]),
     );
+
+    const validationErrors: string[] = [];
+    const seenPairs = new Set<string>();
+    for (const m of data.matches) {
+      const homeCode = m.home.trim().toLowerCase();
+      const awayCode = m.away.trim().toLowerCase();
+      if (homeCode === awayCode) validationErrors.push(`Invalid match: ${m.home} vs ${m.away}`);
+      if (!teamByCode.has(homeCode)) validationErrors.push(`Unknown team code: ${m.home}`);
+      if (!teamByCode.has(awayCode)) validationErrors.push(`Unknown team code: ${m.away}`);
+      const pairKey = `${homeCode}::${awayCode}`;
+      if (seenPairs.has(pairKey)) validationErrors.push(`Duplicate match: ${m.home} vs ${m.away}`);
+      seenPairs.add(pairKey);
+    }
+    if (validationErrors.length > 0) throw new Error(validationErrors.slice(0, 5).join("; "));
 
     await clearTournamentMatches(admin, data.baseTournamentId);
 
