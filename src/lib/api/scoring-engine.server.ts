@@ -140,8 +140,8 @@ export async function rebuildLeaderboard(
     if (r) {
       row.played++;
       const sb = scorePrediction(p.home_score, p.away_score, r.home, r.away, cfg);
-      if (sb.outcome === "exact") row.exact++;
-      else if (sb.outcome === "tendency") row.tendency++;
+      if (sb.outcome === "perfect") row.exact++;
+      else if (sb.outcome === "result") row.tendency++;
     }
   }
   for (const b of bpreds ?? []) {

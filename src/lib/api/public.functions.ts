@@ -144,8 +144,8 @@ export const getPlayerBoard = createServerFn({ method: "GET" })
       if (!res || !entry) continue;
       const b = scorePrediction(pred.home_score, pred.away_score, res.home_score, res.away_score, cfg);
       entry.totalPoints += b.points;
-      if (b.outcome === "exact") entry.exactHits += 1;
-      else if (b.outcome === "tendency") entry.tendencyHits += 1;
+      if (b.outcome === "perfect") entry.exactHits += 1;
+      else if (b.outcome === "result") entry.tendencyHits += 1;
     }
     const leaderboard = Array.from(statsByPart.entries())
       .map(([id, s]) => ({ id, ...s }))
