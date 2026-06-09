@@ -23,14 +23,14 @@ export function tendencyOf(home: number, away: number): Tendency {
 
 export interface ScoreBreakdown {
   points: number;
-  outcome: "exact" | "tendency" | "incorrect";
+  outcome: "perfect" | "result" | "miss";
 }
 
 /**
  * Score a single match prediction against the real result.
- * - Exact score => exactScorePoints
- * - Correct tendency (winner/draw) but wrong score => tendencyPoints
- * - Wrong tendency => incorrectPoints
+ * - Perfect score => exactScorePoints
+ * - Correct result (winner/draw) but wrong score => tendencyPoints
+ * - Wrong result => incorrectPoints
  */
 export function scorePrediction(
   predHome: number,
@@ -40,12 +40,12 @@ export function scorePrediction(
   cfg: ScoringConfig = DEFAULT_SCORING,
 ): ScoreBreakdown {
   if (predHome === realHome && predAway === realAway) {
-    return { points: cfg.exactScorePoints, outcome: "exact" };
+    return { points: cfg.exactScorePoints, outcome: "perfect" };
   }
   if (tendencyOf(predHome, predAway) === tendencyOf(realHome, realAway)) {
-    return { points: cfg.tendencyPoints, outcome: "tendency" };
+    return { points: cfg.tendencyPoints, outcome: "result" };
   }
-  return { points: cfg.incorrectPoints, outcome: "incorrect" };
+  return { points: cfg.incorrectPoints, outcome: "miss" };
 }
 
 // Bonus configuration (champion, top scorer, finalists, custom).

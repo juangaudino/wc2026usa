@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Trophy, Medal, Minus, ChevronUp, ChevronDown, Users } from "lucide-react";
 import { tendencyOf } from "@/lib/scoring";
 
@@ -23,6 +25,10 @@ function PublicLeague() {
   const { slug } = Route.useParams();
   const fetchLeague = useServerFn(getPublicLeague);
   const fetchBoard = useServerFn(getLeagueLeaderboard);
+  const [isAuthed, setIsAuthed] = useState(false);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setIsAuthed(!!data.user));
+  }, []);
   const { data } = useQuery({
     queryKey: ["public-league", slug],
     queryFn: () => fetchLeague({ data: { slug } }),
@@ -48,7 +54,11 @@ function PublicLeague() {
           <h1 className="font-display text-2xl font-bold">League not found</h1>
           <p className="mt-2 text-muted-foreground">This league link is not valid.</p>
           <Button asChild className="mt-6">
-            <Link to="/">Back home</Link>
+            {isAuthed ? (
+              <Link to="/dashboard">Back to dashboard</Link>
+            ) : (
+              <Link to="/">Back home</Link>
+            )}
           </Button>
         </main>
       </div>

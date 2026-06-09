@@ -382,17 +382,17 @@ function MatchPredictionCard({
           {breakdown && (
             <Badge
               className={
-                breakdown.outcome === "exact"
+                breakdown.outcome === "perfect"
                   ? "bg-primary text-primary-foreground"
-                  : breakdown.outcome === "tendency"
+                  : breakdown.outcome === "result"
                     ? "bg-accent text-accent-foreground"
                     : "bg-secondary"
               }
             >
-              {breakdown.outcome === "exact"
-                ? "Exact score"
-                : breakdown.outcome === "tendency"
-                  ? "Correct tendency"
+              {breakdown.outcome === "perfect"
+                ? "Perfect score"
+                : breakdown.outcome === "result"
+                  ? "Correct result"
                   : "Missed"}{" "}
               +{breakdown.points}
             </Badge>
@@ -496,11 +496,11 @@ function PredictionLeaguePanel({
             </div>
             <div>
               <p className="font-display text-2xl font-bold">{stats.exactHits}</p>
-              <p className="text-xs text-muted-foreground">Exact</p>
+              <p className="text-xs text-muted-foreground">Perfect</p>
             </div>
             <div>
               <p className="font-display text-2xl font-bold">{stats.tendencyHits}</p>
-              <p className="text-xs text-muted-foreground">Tendency</p>
+              <p className="text-xs text-muted-foreground">Results</p>
             </div>
           </div>
           {stats.pendingMatches > 0 && (
@@ -518,8 +518,8 @@ function PredictionLeaguePanel({
               <th className="px-3 py-2">Rank</th>
               <th className="px-3 py-2">Player</th>
               <th className="px-3 py-2 text-center">Points</th>
-              <th className="px-3 py-2 text-center">Exact</th>
-              <th className="px-3 py-2 text-center">Tendency</th>
+              <th className="px-3 py-2 text-center">Perfect</th>
+              <th className="px-3 py-2 text-center">Result</th>
             </tr>
           </thead>
           <tbody>
