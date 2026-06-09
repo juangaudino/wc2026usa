@@ -113,6 +113,8 @@ function PlayerBoard() {
             {bonusConfig.length > 0 && (
               <TabsTrigger value="bonus">Bonus</TabsTrigger>
             )}
+            <TabsTrigger value="league">Prediction League</TabsTrigger>
+            <TabsTrigger value="tournament">Tournament</TabsTrigger>
           </TabsList>
 
           <TabsContent value="matches" className="mt-4 space-y-3">
@@ -149,6 +151,18 @@ function PlayerBoard() {
               ))}
             </TabsContent>
           )}
+
+          <TabsContent value="league" className="mt-4">
+            <PredictionLeaguePanel
+              playerName={data.participant.name}
+              stats={(data as any).currentParticipantStats}
+              leaderboard={(data as any).leaderboard ?? []}
+            />
+          </TabsContent>
+
+          <TabsContent value="tournament" className="mt-4">
+            <TournamentPanel standings={(data as any).groupStandings ?? []} />
+          </TabsContent>
         </Tabs>
 
         <p className="mt-8 flex items-center justify-center gap-2 text-xs text-muted-foreground">
