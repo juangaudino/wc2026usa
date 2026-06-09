@@ -69,21 +69,26 @@ function PlayerBoard() {
     );
   }
 
-  const t = data.tournament;
+  const league = data.league as any;
+  const base = data.base as any;
   const tm = teamMap(data.teams as any);
   const resByMatch = new Map(data.results.map((r: any) => [r.match_id, r]));
   const predByMatch = new Map(data.predictions.map((p: any) => [p.match_id, p]));
   const bonusByKey = new Map(
     data.bonusPredictions.map((b: any) => [b.bonus_key, b.value]),
   );
-  const bonusConfig = (t.bonus_config ?? []) as any[];
+  const bonusConfig = ((data.bonusRules ?? []) as any[]).map((b) => ({
+    key: b.bonus_key,
+    label: b.label,
+    points: b.points,
+  }));
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen" style={themeStyleVars(base?.themes)}>
       <SiteHeader
         right={
           <Badge variant="outline" className="capitalize">
-            {t.sport_type}
+            {base?.sport_type}
           </Badge>
         }
       />
@@ -92,8 +97,10 @@ function PlayerBoard() {
         <h1 className="mt-2 font-display text-3xl font-bold">
           Hi, {data.participant.name} 👋
         </h1>
-        <p className="mt-1 text-muted-foreground">{t.name}</p>
-        {t.predictions_locked && (
+        <p className="mt-1 text-muted-foreground">
+          {league?.name} · {base?.name}
+        </p>
+        {league?.predictions_locked && (
           <Badge variant="secondary" className="mt-3">
             <Lock className="mr-1 h-3 w-3" /> Predictions locked
           </Badge>
