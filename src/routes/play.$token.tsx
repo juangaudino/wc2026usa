@@ -125,7 +125,7 @@ function PlayerBoard() {
                 token={token}
                 match={m}
                 tm={tm}
-                locked={isLocked(t, m)}
+                locked={isLocked(league, m)}
                 prediction={predByMatch.get(m.id)}
                 result={resByMatch.get(m.id)}
               />
@@ -143,7 +143,7 @@ function PlayerBoard() {
                   key={b.key}
                   token={token}
                   field={b}
-                  locked={Boolean(t.predictions_locked)}
+                  locked={Boolean(league?.predictions_locked)}
                   value={bonusByKey.get(b.key) ?? ""}
                 />
               ))}
