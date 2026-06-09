@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as TSlugRouteImport } from './routes/t.$slug'
+import { Route as PlayTokenRouteImport } from './routes/play.$token'
 import { Route as AdminThemesRouteImport } from './routes/admin.themes'
 import { Route as AdminTournamentIdRouteImport } from './routes/admin.tournament.$id'
 import { Route as TSlugMatchMatchIdRouteImport } from './routes/t.$slug.match.$matchId'
@@ -29,6 +30,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
 const TSlugRoute = TSlugRouteImport.update({
   id: '/t/$slug',
   path: '/t/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlayTokenRoute = PlayTokenRouteImport.update({
+  id: '/play/$token',
+  path: '/play/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminThemesRoute = AdminThemesRouteImport.update({
@@ -50,6 +56,7 @@ const TSlugMatchMatchIdRoute = TSlugMatchMatchIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin/themes': typeof AdminThemesRoute
+  '/play/$token': typeof PlayTokenRoute
   '/t/$slug': typeof TSlugRouteWithChildren
   '/admin/': typeof AdminIndexRoute
   '/admin/tournament/$id': typeof AdminTournamentIdRoute
@@ -58,6 +65,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin/themes': typeof AdminThemesRoute
+  '/play/$token': typeof PlayTokenRoute
   '/t/$slug': typeof TSlugRouteWithChildren
   '/admin': typeof AdminIndexRoute
   '/admin/tournament/$id': typeof AdminTournamentIdRoute
@@ -67,6 +75,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin/themes': typeof AdminThemesRoute
+  '/play/$token': typeof PlayTokenRoute
   '/t/$slug': typeof TSlugRouteWithChildren
   '/admin/': typeof AdminIndexRoute
   '/admin/tournament/$id': typeof AdminTournamentIdRoute
@@ -77,6 +86,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin/themes'
+    | '/play/$token'
     | '/t/$slug'
     | '/admin/'
     | '/admin/tournament/$id'
@@ -85,6 +95,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin/themes'
+    | '/play/$token'
     | '/t/$slug'
     | '/admin'
     | '/admin/tournament/$id'
@@ -93,6 +104,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin/themes'
+    | '/play/$token'
     | '/t/$slug'
     | '/admin/'
     | '/admin/tournament/$id'
@@ -102,6 +114,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminThemesRoute: typeof AdminThemesRoute
+  PlayTokenRoute: typeof PlayTokenRoute
   TSlugRoute: typeof TSlugRouteWithChildren
   AdminIndexRoute: typeof AdminIndexRoute
   AdminTournamentIdRoute: typeof AdminTournamentIdRoute
@@ -128,6 +141,13 @@ declare module '@tanstack/react-router' {
       path: '/t/$slug'
       fullPath: '/t/$slug'
       preLoaderRoute: typeof TSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/play/$token': {
+      id: '/play/$token'
+      path: '/play/$token'
+      fullPath: '/play/$token'
+      preLoaderRoute: typeof PlayTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/themes': {
@@ -167,6 +187,7 @@ const TSlugRouteWithChildren = TSlugRoute._addFileChildren(TSlugRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminThemesRoute: AdminThemesRoute,
+  PlayTokenRoute: PlayTokenRoute,
   TSlugRoute: TSlugRouteWithChildren,
   AdminIndexRoute: AdminIndexRoute,
   AdminTournamentIdRoute: AdminTournamentIdRoute,
