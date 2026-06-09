@@ -899,3 +899,119 @@ export const ownerImportMatches = createServerFn({ method: "POST" })
     }
     return { inserted, updated, errors };
   });
+
+/* ----------------------------- OWNER LEAGUE/TOURNAMENT MGMT ----------------------------- */
+export const ownerListAllLeagues = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const admin = await ctx();
+    const { assertOwner } = await import("./authz.server");
+    await assertOwner(admin, context.userId);
+
+    const { data: leagues } = await admin
+      .from("private_leagues")
+      .select("id, name, slug, manager_id, base_tournament_id")
+      .order("created_at", { ascending: false });
+    const rows = leagues ?? [];
+
+    const managerIds = [...new Set(rows.map((l: any) => l.manager_id).filter(Boolean))];
+    const baseIds = [...new Set(rows.map((l: any) => l.base_tournament_id).filter(Boolean))];
+
+    const { data: profiles } = managerIds.length
+      ? await admin.from("profiles").select("id, display_name, email").in("id", managerIds)
+      : { data: [] as any[] };
+    const { data: bases } = baseIds.length
+      ? await admin.from("base_tournaments").select("id, name").in("id", baseIds)
+      : { data: [] as any[] };
+
+    const profById = new Map((profiles ?? []).map((p: any) => [p.id, p]));
+    const baseById = new Map((bases ?? []).map((b: any) => [b.id, b]));
+
+    return rows.map((l: any) => ({
+      id: l.id,
+      name: l.name,
+      slug: l.slug,
+      managerName:
+        profById.get(l.manager_id)?.display_name ??
+        profById.get(l.manager_id)?.email ??
+        "Unknown",
+      baseTournamentName: baseById.get(l.base_tournament_id)?.name ?? "—",
+    }));
+  });
+
+export const deleteLeague = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ leagueId: z.string().uuid() }))
+  .handler(async ({ context, data }) => {
+    const admin = await ctx();
+    const { assertOwner } = await import("./authz.server");
+    await assertOwner(admin, context.userId);
+    const { error } = await admin
+      .from("private_leagues")
+      .delete()
+      .eq("id", data.leagueId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const ownerUpdateBaseTournament = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    z.object({
+      id: z.string().uuid(),
+      name: z.string().trim().min(1).max(120),
+      description: z.string().trim().max(2000).optional().nullable(),
+      season: z.string().trim().max(40).optional().nullable(),
+      sport_type: z.string().trim().min(1).max(40),
+      status: z.enum(["draft", "active", "archived", "published"]),
+      starts_at: z.string().trim().max(40).optional().nullable(),
+      default_exact_points: z.number().int().min(0).max(1000),
+      default_tendency_points: z.number().int().min(0).max(1000),
+      default_incorrect_points: z.number().int().min(-1000).max(1000),
+    }),
+  )
+  .handler(async ({ context, data }) => {
+    const admin = await ctx();
+    const { assertOwner } = await import("./authz.server");
+    await assertOwner(admin, context.userId);
+    const { data: row, error } = await admin
+      .from("base_tournaments")
+      .update({
+        name: data.name.trim(),
+        description: data.description?.trim() || null,
+        season: data.season?.trim() || null,
+        sport_type: data.sport_type.trim(),
+        status: data.status,
+        starts_at: data.starts_at?.trim() || null,
+        default_exact_points: data.default_exact_points,
+        default_tendency_points: data.default_tendency_points,
+        default_incorrect_points: data.default_incorrect_points,
+      })
+      .eq("id", data.id)
+      .select("*")
+      .single();
+    if (error) throw new Error(error.message);
+    return row;
+  });
+
+export const ownerDeleteBaseTournament = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ context, data }) => {
+    const admin = await ctx();
+    const { assertOwner } = await import("./authz.server");
+    await assertOwner(admin, context.userId);
+    const { count } = await admin
+      .from("private_leagues")
+      .select("id", { count: "exact", head: true })
+      .eq("base_tournament_id", data.id);
+    if ((count ?? 0) > 0) {
+      throw new Error("Cannot delete: leagues exist for this tournament.");
+    }
+    const { error } = await admin
+      .from("base_tournaments")
+      .delete()
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
