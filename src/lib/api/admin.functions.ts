@@ -749,3 +749,153 @@ export const clearBonusRules = createServerFn({ method: "POST" })
     await rebuildLeaderboard(admin, data.leagueId);
     return { ok: true };
   });
+
+/* ----------------------------- IMPORT TEAMS / MATCHES ----------------------------- */
+export const ownerImportTeams = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    z.object({
+      baseTournamentId: z.string().uuid(),
+      teams: z
+        .array(
+          z.object({
+            name: z.string().trim().min(1).max(120),
+            short_code: z.string().trim().min(1).max(10),
+            flag_emoji: z.string().trim().max(16).optional().nullable(),
+            group_name: z.string().trim().max(40).optional().nullable(),
+          }),
+        )
+        .min(1)
+        .max(500),
+    }),
+  )
+  .handler(async ({ context, data }) => {
+    const admin = await ctx();
+    const { assertOwner } = await import("./authz.server");
+    await assertOwner(admin, context.userId);
+
+    const { data: existing } = await admin
+      .from("teams")
+      .select("id, short_code")
+      .eq("base_tournament_id", data.baseTournamentId);
+    const byCode = new Map(
+      (existing ?? []).map((t: any) => [String(t.short_code).toLowerCase(), t.id]),
+    );
+
+    let inserted = 0;
+    let updated = 0;
+    for (const t of data.teams) {
+      const code = t.short_code.trim();
+      const row = {
+        name: t.name.trim(),
+        short_code: code,
+        flag_emoji: t.flag_emoji?.trim() || null,
+        group_name: t.group_name?.trim() || null,
+      };
+      const id = byCode.get(code.toLowerCase());
+      if (id) {
+        const { error } = await admin.from("teams").update(row).eq("id", id);
+        if (error) throw new Error(error.message);
+        updated += 1;
+      } else {
+        const { data: ins, error } = await admin
+          .from("teams")
+          .insert({ ...row, base_tournament_id: data.baseTournamentId })
+          .select("id")
+          .single();
+        if (error) throw new Error(error.message);
+        byCode.set(code.toLowerCase(), ins.id);
+        inserted += 1;
+      }
+    }
+    return { inserted, updated };
+  });
+
+export const ownerImportMatches = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    z.object({
+      baseTournamentId: z.string().uuid(),
+      matches: z
+        .array(
+          z.object({
+            home: z.string().trim().min(1).max(10),
+            away: z.string().trim().min(1).max(10),
+            group_name: z.string().trim().max(40).optional().nullable(),
+            stage: z.string().trim().max(40).optional().nullable(),
+            match_time: z.string().trim().max(40).optional().nullable(),
+            venue: z.string().trim().max(120).optional().nullable(),
+            city: z.string().trim().max(120).optional().nullable(),
+          }),
+        )
+        .min(1)
+        .max(500),
+    }),
+  )
+  .handler(async ({ context, data }) => {
+    const admin = await ctx();
+    const { assertOwner } = await import("./authz.server");
+    await assertOwner(admin, context.userId);
+
+    const { data: teams } = await admin
+      .from("teams")
+      .select("id, short_code")
+      .eq("base_tournament_id", data.baseTournamentId);
+    const teamByCode = new Map(
+      (teams ?? []).map((t: any) => [String(t.short_code).toLowerCase(), t.id]),
+    );
+
+    const { data: existing } = await admin
+      .from("matches")
+      .select("id, home_team_id, away_team_id")
+      .eq("base_tournament_id", data.baseTournamentId);
+    const matchKey = (h: string, a: string) => `${h}::${a}`;
+    const byPair = new Map(
+      (existing ?? []).map((m: any) => [matchKey(m.home_team_id, m.away_team_id), m.id]),
+    );
+
+    let inserted = 0;
+    let updated = 0;
+    const errors: string[] = [];
+
+    for (const m of data.matches) {
+      const homeId = teamByCode.get(m.home.trim().toLowerCase());
+      const awayId = teamByCode.get(m.away.trim().toLowerCase());
+      if (!homeId || !awayId) {
+        const missing = [!homeId ? m.home : null, !awayId ? m.away : null]
+          .filter(Boolean)
+          .join(" / ");
+        errors.push(`Could not resolve ${missing} (${m.home} vs ${m.away})`);
+        continue;
+      }
+      const row = {
+        match_time: m.match_time?.trim() || null,
+        venue: m.venue?.trim() || null,
+        city: m.city?.trim() || null,
+        stage: m.stage?.trim() || "group",
+        group_name: m.group_name?.trim() || null,
+      };
+      const id = byPair.get(matchKey(homeId, awayId));
+      if (id) {
+        const { error } = await admin.from("matches").update(row).eq("id", id);
+        if (error) throw new Error(error.message);
+        updated += 1;
+      } else {
+        const { data: ins, error } = await admin
+          .from("matches")
+          .insert({
+            ...row,
+            base_tournament_id: data.baseTournamentId,
+            home_team_id: homeId,
+            away_team_id: awayId,
+            status: "scheduled",
+          })
+          .select("id")
+          .single();
+        if (error) throw new Error(error.message);
+        byPair.set(matchKey(homeId, awayId), ins.id);
+        inserted += 1;
+      }
+    }
+    return { inserted, updated, errors };
+  });
