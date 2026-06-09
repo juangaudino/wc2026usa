@@ -14,6 +14,55 @@ function emailFromClaims(claims: any): string | null {
   return claims?.email ?? null;
 }
 
+async function clearTournamentTeamsAndMatches(admin: any, baseTournamentId: string) {
+  const { data: matches, error: matchLookupErr } = await admin
+    .from("matches")
+    .select("id")
+    .eq("base_tournament_id", baseTournamentId);
+  if (matchLookupErr) throw new Error(matchLookupErr.message);
+  const matchIds = (matches ?? []).map((m: any) => m.id);
+  if (matchIds.length > 0) {
+    const { error: logErr } = await admin.from("result_change_log").delete().in("match_id", matchIds);
+    if (logErr) throw new Error(logErr.message);
+    const { error: predErr } = await admin.from("match_predictions").delete().in("match_id", matchIds);
+    if (predErr) throw new Error(predErr.message);
+    const { error: resultErr } = await admin.from("match_results").delete().in("match_id", matchIds);
+    if (resultErr) throw new Error(resultErr.message);
+  }
+  const { error: matchDeleteErr } = await admin
+    .from("matches")
+    .delete()
+    .eq("base_tournament_id", baseTournamentId);
+  if (matchDeleteErr) throw new Error(matchDeleteErr.message);
+  const { error: teamDeleteErr } = await admin
+    .from("teams")
+    .delete()
+    .eq("base_tournament_id", baseTournamentId);
+  if (teamDeleteErr) throw new Error(teamDeleteErr.message);
+}
+
+async function clearTournamentMatches(admin: any, baseTournamentId: string) {
+  const { data: matches, error: matchLookupErr } = await admin
+    .from("matches")
+    .select("id")
+    .eq("base_tournament_id", baseTournamentId);
+  if (matchLookupErr) throw new Error(matchLookupErr.message);
+  const matchIds = (matches ?? []).map((m: any) => m.id);
+  if (matchIds.length > 0) {
+    const { error: logErr } = await admin.from("result_change_log").delete().in("match_id", matchIds);
+    if (logErr) throw new Error(logErr.message);
+    const { error: predErr } = await admin.from("match_predictions").delete().in("match_id", matchIds);
+    if (predErr) throw new Error(predErr.message);
+    const { error: resultErr } = await admin.from("match_results").delete().in("match_id", matchIds);
+    if (resultErr) throw new Error(resultErr.message);
+  }
+  const { error: matchDeleteErr } = await admin
+    .from("matches")
+    .delete()
+    .eq("base_tournament_id", baseTournamentId);
+  if (matchDeleteErr) throw new Error(matchDeleteErr.message);
+}
+
 /* ----------------------------- ACCOUNT ----------------------------- */
 export const getMyAccount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -97,11 +146,9 @@ export const ownerGenerateWorldCup2026 = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     const admin = await ctx();
-    const { assertOwner, slugify } = await import("./authz.server");
+    const { assertOwner } = await import("./authz.server");
     await assertOwner(admin, context.userId);
-    const { WC2026_TEAMS, buildWorldCup2026Matches, WC2026_BONUS } = await import(
-      "@/lib/wc2026-fixtures"
-    );
+    const { WC2026_BONUS } = await import("@/lib/wc2026-fixtures");
 
     const slug = "world-cup-2026";
     const { data: existing } = await admin
@@ -122,7 +169,7 @@ export const ownerGenerateWorldCup2026 = createServerFn({ method: "POST" })
       slug,
       sport_type: "football",
       season: "2026",
-      description: "FIFA World Cup 2026 — 48 teams, 12 groups across North America.",
+      description: "FIFA World Cup 2026 empty template — upload teams and fixtures to build the tournament.",
       status: "published",
       theme_id: theme?.id ?? null,
       default_exact_points: data?.defaultExactPoints ?? 3,
@@ -135,11 +182,8 @@ export const ownerGenerateWorldCup2026 = createServerFn({ method: "POST" })
 
     let base: { id: string };
     if (existing) {
-      // Regenerate cleanly: wipe old fixtures, results and predictions for this
-      // tournament (FK cascade removes match_results / match_predictions), then
-      // rebuild from scratch while keeping any existing leagues attached.
-      await admin.from("matches").delete().eq("base_tournament_id", existing.id);
-      await admin.from("teams").delete().eq("base_tournament_id", existing.id);
+      // Reset cleanly to an empty World Cup template while keeping existing leagues attached.
+      await clearTournamentTeamsAndMatches(admin, existing.id);
       const { error: updErr } = await admin
         .from("base_tournaments")
         .update(baseFields)
@@ -156,40 +200,7 @@ export const ownerGenerateWorldCup2026 = createServerFn({ method: "POST" })
       base = created;
     }
 
-    // Teams
-    const { data: teamRows, error: teamErr } = await admin
-      .from("teams")
-      .insert(
-        WC2026_TEAMS.map((t) => ({
-          base_tournament_id: base.id,
-          name: t.name,
-          short_code: t.short_code,
-          flag_emoji: t.flag_emoji,
-          group_name: t.group_name,
-        })),
-      )
-      .select("id, short_code");
-    if (teamErr) throw new Error(teamErr.message);
-    const byCode = new Map((teamRows ?? []).map((t: any) => [t.short_code, t.id]));
-
-    // Matches
-    const matches = buildWorldCup2026Matches();
-    const { error: matchErr } = await admin.from("matches").insert(
-      matches.map((m) => ({
-        base_tournament_id: base.id,
-        home_team_id: byCode.get(m.homeShort),
-        away_team_id: byCode.get(m.awayShort),
-        stage: m.stage,
-        group_name: m.group_name,
-        match_time: m.match_time,
-        venue: m.venue,
-        city: m.city,
-        status: "scheduled",
-      })),
-    );
-    if (matchErr) throw new Error(matchErr.message);
-
-    return { ok: true, baseTournamentId: base.id, teams: teamRows?.length ?? 0, matches: matches.length };
+    return { ok: true, baseTournamentId: base.id, teams: 0, matches: 0 };
   });
 
 export const ownerListThemes = createServerFn({ method: "POST" })
@@ -791,13 +802,22 @@ export const ownerImportTeams = createServerFn({ method: "POST" })
     const { assertOwner } = await import("./authz.server");
     await assertOwner(admin, context.userId);
 
-    const { data: existing } = await admin
-      .from("teams")
-      .select("id, short_code")
-      .eq("base_tournament_id", data.baseTournamentId);
-    const byCode = new Map(
-      (existing ?? []).map((t: any) => [String(t.short_code).toLowerCase(), t.id]),
-    );
+    const seenCodes = new Set<string>();
+    const groupCounts = new Map<string, number>();
+    for (const t of data.teams) {
+      const code = t.short_code.trim().toLowerCase();
+      if (seenCodes.has(code)) throw new Error(`Duplicate team code: ${t.short_code}`);
+      seenCodes.add(code);
+      const group = t.group_name?.trim();
+      if (group) groupCounts.set(group, (groupCounts.get(group) ?? 0) + 1);
+    }
+    for (const [group, count] of groupCounts) {
+      if (count > 4) throw new Error(`Group ${group} has ${count} teams. World Cup groups can have at most 4.`);
+    }
+
+    await clearTournamentTeamsAndMatches(admin, data.baseTournamentId);
+
+    const byCode = new Map<string, string>();
 
     let inserted = 0;
     let updated = 0;
@@ -825,7 +845,7 @@ export const ownerImportTeams = createServerFn({ method: "POST" })
         inserted += 1;
       }
     }
-    return { inserted, updated };
+    return { inserted, updated, replaced: true };
   });
 
 export const ownerImportMatches = createServerFn({ method: "POST" })
@@ -862,14 +882,24 @@ export const ownerImportMatches = createServerFn({ method: "POST" })
       (teams ?? []).map((t: any) => [String(t.short_code).toLowerCase(), t.id]),
     );
 
-    const { data: existing } = await admin
-      .from("matches")
-      .select("id, home_team_id, away_team_id")
-      .eq("base_tournament_id", data.baseTournamentId);
+    const validationErrors: string[] = [];
+    const seenPairs = new Set<string>();
+    for (const m of data.matches) {
+      const homeCode = m.home.trim().toLowerCase();
+      const awayCode = m.away.trim().toLowerCase();
+      if (homeCode === awayCode) validationErrors.push(`Invalid match: ${m.home} vs ${m.away}`);
+      if (!teamByCode.has(homeCode)) validationErrors.push(`Unknown team code: ${m.home}`);
+      if (!teamByCode.has(awayCode)) validationErrors.push(`Unknown team code: ${m.away}`);
+      const pairKey = `${homeCode}::${awayCode}`;
+      if (seenPairs.has(pairKey)) validationErrors.push(`Duplicate match: ${m.home} vs ${m.away}`);
+      seenPairs.add(pairKey);
+    }
+    if (validationErrors.length > 0) throw new Error(validationErrors.slice(0, 5).join("; "));
+
+    await clearTournamentMatches(admin, data.baseTournamentId);
+
     const matchKey = (h: string, a: string) => `${h}::${a}`;
-    const byPair = new Map(
-      (existing ?? []).map((m: any) => [matchKey(m.home_team_id, m.away_team_id), m.id]),
-    );
+    const byPair = new Map<string, string>();
 
     let inserted = 0;
     let updated = 0;
@@ -914,7 +944,7 @@ export const ownerImportMatches = createServerFn({ method: "POST" })
         inserted += 1;
       }
     }
-    return { inserted, updated, errors };
+    return { inserted, updated, errors, replaced: true };
   });
 
 /* ----------------------------- OWNER LEAGUE/TOURNAMENT MGMT ----------------------------- */
