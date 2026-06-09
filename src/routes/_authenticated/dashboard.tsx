@@ -296,6 +296,7 @@ function TournamentsPanel() {
             <p className="font-semibold">Generate official tournament</p>
             <p className="text-sm text-muted-foreground">
               Build World Cup 2026 with all 48 teams and group-stage fixtures.
+              Regenerating replaces old fixtures and clears previous results.
             </p>
           </div>
           <Button onClick={() => generate.mutate()} disabled={generate.isPending}>
