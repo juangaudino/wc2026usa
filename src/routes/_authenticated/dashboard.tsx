@@ -73,6 +73,7 @@ import {
   deleteLeague,
   ownerUpdateBaseTournament,
   ownerDeleteBaseTournament,
+  ownerCleanOrphanResults,
   listBaseTournamentsForManager,
   listMyLeagues,
   createLeague,
@@ -248,6 +249,7 @@ function TournamentsPanel() {
   const gen = useServerFn(ownerGenerateWorldCup2026);
   const listThemes = useServerFn(ownerListThemes);
   const assign = useServerFn(ownerAssignTheme);
+  const cleanOrphans = useServerFn(ownerCleanOrphanResults);
   const { data } = useQuery({ queryKey: ["owner-bases"], queryFn: () => list() });
   const { data: themes } = useQuery({ queryKey: ["owner-themes"], queryFn: () => listThemes() });
 
@@ -274,6 +276,13 @@ function TournamentsPanel() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["owner-bases"] });
       toast.success("Theme assigned");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+  });
+  const cleanOrphanMutation = useMutation({
+    mutationFn: () => cleanOrphans(),
+    onSuccess: (r: any) => {
+      toast.success(`Removed ${r.deleted} orphan results`);
     },
     onError: (e: any) => toast.error(e?.message ?? "Failed"),
   });
@@ -313,6 +322,22 @@ function TournamentsPanel() {
           </div>
         </div>
       </Card>
+
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => cleanOrphanMutation.mutate()}
+          disabled={cleanOrphanMutation.isPending}
+        >
+          {cleanOrphanMutation.isPending ? (
+            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+          ) : (
+            <Trash2 className="mr-1 h-4 w-4" />
+          )}
+          Clean orphan results
+        </Button>
+      </div>
 
       {rows.length === 0 ? (
         <Empty icon={Trophy} text="No base tournaments yet." />
