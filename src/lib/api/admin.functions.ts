@@ -97,7 +97,7 @@ export const ownerGenerateWorldCup2026 = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     const admin = await ctx();
-    const { assertOwner, slugify } = await import("./authz.server");
+    const { assertOwner } = await import("./authz.server");
     await assertOwner(admin, context.userId);
     const { WC2026_BONUS } = await import("@/lib/wc2026-fixtures");
 
@@ -136,8 +136,16 @@ export const ownerGenerateWorldCup2026 = createServerFn({ method: "POST" })
       // Regenerate cleanly: wipe old fixtures, results and predictions for this
       // tournament (FK cascade removes match_results / match_predictions), then
       // rebuild from scratch while keeping any existing leagues attached.
-      await admin.from("matches").delete().eq("base_tournament_id", existing.id);
-      await admin.from("teams").delete().eq("base_tournament_id", existing.id);
+      const { error: matchDeleteErr } = await admin
+        .from("matches")
+        .delete()
+        .eq("base_tournament_id", existing.id);
+      if (matchDeleteErr) throw new Error(matchDeleteErr.message);
+      const { error: teamDeleteErr } = await admin
+        .from("teams")
+        .delete()
+        .eq("base_tournament_id", existing.id);
+      if (teamDeleteErr) throw new Error(teamDeleteErr.message);
       const { error: updErr } = await admin
         .from("base_tournaments")
         .update(baseFields)
