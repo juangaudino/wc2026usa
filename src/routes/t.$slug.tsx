@@ -79,10 +79,13 @@ function PublicLeague() {
         <h1 className="mt-2 font-display text-3xl font-bold">{league.name}</h1>
         <p className="mt-1 text-muted-foreground">{base?.name}</p>
 
+        const standings = computeGroupStandings(data.teams, data.matches, data.results);
+
         <Tabs defaultValue="leaderboard" className="mt-6">
           <TabsList>
             <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
             <TabsTrigger value="fixtures">Fixtures</TabsTrigger>
+            <TabsTrigger value="standings">Standings</TabsTrigger>
           </TabsList>
 
           <TabsContent value="leaderboard" className="mt-4 space-y-2">
@@ -140,6 +143,20 @@ function PublicLeague() {
                 </Card>
               );
             })}
+          </TabsContent>
+
+          <TabsContent value="standings" className="mt-4 space-y-4">
+            <div className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-primary" />
+              <h2 className="font-display text-xl font-bold">Tournament Standings</h2>
+            </div>
+            {standings.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No results yet — standings will appear once matches are played.
+              </p>
+            ) : (
+              <GroupTables standings={standings} />
+            )}
           </TabsContent>
         </Tabs>
 
