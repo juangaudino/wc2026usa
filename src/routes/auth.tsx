@@ -82,6 +82,12 @@ function AuthPage() {
           <p className="mt-1 text-sm text-muted-foreground">
             Private access for league managers. New accounts need owner approval.
           </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Manager access. Platform Owner?{" "}
+            <Link to="/owner/login" className="underline underline-offset-2 hover:text-primary">
+              Sign in at /owner/login
+            </Link>
+          </p>
         </div>
 
         <Card className="glass-card p-6">
