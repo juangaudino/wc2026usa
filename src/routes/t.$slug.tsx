@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { Trophy, Medal, Minus, ChevronUp, ChevronDown, Target, Users } from "lucide-react";
+import { Trophy, Medal, Minus, ChevronUp, ChevronDown, Users } from "lucide-react";
 
 import { SiteHeader } from "@/components/app/site-header";
 import { Card } from "@/components/ui/card";
