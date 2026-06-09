@@ -118,7 +118,7 @@ function ManageLeague() {
         <Tabs defaultValue="players" className="mt-6">
           <TabsList>
             <TabsTrigger value="players">Players</TabsTrigger>
-            <TabsTrigger value="import">Import</TabsTrigger>
+            {/* <TabsTrigger value="import">Import</TabsTrigger> */}
             <TabsTrigger value="results">Results</TabsTrigger>
             <TabsTrigger value="bonus">Bonus answers</TabsTrigger>
             <TabsTrigger value="rules">Rules</TabsTrigger>
@@ -127,9 +127,9 @@ function ManageLeague() {
           <TabsContent value="players" className="mt-4">
             <PlayersPanel leagueId={id} data={data} />
           </TabsContent>
-          <TabsContent value="import" className="mt-4">
+          {/* <TabsContent value="import" className="mt-4">
             <ImportPanel leagueId={id} />
-          </TabsContent>
+          </TabsContent> */}
           <TabsContent value="results" className="mt-4">
             <ResultsPanel leagueId={id} data={data} />
           </TabsContent>
