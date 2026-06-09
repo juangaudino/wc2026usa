@@ -279,6 +279,13 @@ function TournamentsPanel() {
     },
     onError: (e: any) => toast.error(e?.message ?? "Failed"),
   });
+  const cleanOrphanMutation = useMutation({
+    mutationFn: () => cleanOrphans(),
+    onSuccess: (r: any) => {
+      toast.success(`Removed ${r.deleted} orphan results`);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+  });
 
   const rows = data ?? [];
   return (
