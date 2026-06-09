@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Trophy, Crown, Lock, Check, Loader2, Target, Users } from "lucide-react";
 import { toast } from "sonner";
 
@@ -117,21 +117,15 @@ function PlayerBoard() {
             <TabsTrigger value="tournament">Tournament</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="matches" className="mt-4 space-y-3">
-            {(data.matches as any[]).length === 0 && (
-              <p className="text-sm text-muted-foreground">No matches scheduled yet.</p>
-            )}
-            {(data.matches as any[]).map((m) => (
-              <MatchPredictionCard
-                key={m.id}
-                token={token}
-                match={m}
-                tm={tm}
-                locked={isLocked(league, m)}
-                prediction={predByMatch.get(m.id)}
-                result={resByMatch.get(m.id)}
-              />
-            ))}
+          <TabsContent value="matches" className="mt-4">
+            <MatchesPanel
+              token={token}
+              matches={data.matches as any[]}
+              tm={tm}
+              league={league}
+              predByMatch={predByMatch}
+              resByMatch={resByMatch}
+            />
           </TabsContent>
 
           {bonusConfig.length > 0 && (
@@ -174,31 +168,152 @@ function PlayerBoard() {
   );
 }
 
-function MatchPredictionCard({
+function MatchesPanel({
   token,
+  matches,
+  tm,
+  league,
+  predByMatch,
+  resByMatch,
+}: {
+  token: string;
+  matches: any[];
+  tm: Record<string, any>;
+  league: any;
+  predByMatch: Map<any, any>;
+  resByMatch: Map<any, any>;
+}) {
+  const queryClient = useQueryClient();
+  const saveFn = useServerFn(savePlayerPrediction);
+
+  const initial = useMemo(() => {
+    const obj: Record<string, { home: string; away: string }> = {};
+    for (const m of matches) {
+      const p = predByMatch.get(m.id);
+      obj[m.id] = {
+        home: p?.home_score?.toString() ?? "",
+        away: p?.away_score?.toString() ?? "",
+      };
+    }
+    return obj;
+  }, [matches, predByMatch]);
+
+  const [localScores, setLocalScores] = useState<
+    Record<string, { home: string; away: string }>
+  >(initial);
+  const [saving, setSaving] = useState(false);
+
+  function onChange(matchId: string, home: string, away: string) {
+    setLocalScores((prev) => ({ ...prev, [matchId]: { home, away } }));
+  }
+
+  const boardLocked = Boolean(league?.predictions_locked);
+
+  const total = matches.length;
+  const filled = matches.filter((m) => {
+    const s = localScores[m.id];
+    return s && s.home !== "" && s.away !== "";
+  }).length;
+
+  const dirty = matches.some((m) => {
+    const s = localScores[m.id] ?? { home: "", away: "" };
+    const i = initial[m.id] ?? { home: "", away: "" };
+    return s.home !== i.home || s.away !== i.away;
+  });
+
+  async function saveAll() {
+    setSaving(true);
+    let count = 0;
+    try {
+      for (const m of matches) {
+        if (isLocked(league, m)) continue;
+        const s = localScores[m.id];
+        if (!s) continue;
+        const h = parseInt(s.home, 10);
+        const a = parseInt(s.away, 10);
+        if (Number.isNaN(h) || Number.isNaN(a)) continue;
+        await saveFn({
+          data: { token, matchId: m.id, homeScore: h, awayScore: a },
+        });
+        count += 1;
+      }
+      await queryClient.invalidateQueries({ queryKey: ["player-board", token] });
+      toast.success("Predictions saved");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not save predictions");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="space-y-3 pb-24">
+        {matches.length === 0 && (
+          <p className="text-sm text-muted-foreground">No matches scheduled yet.</p>
+        )}
+        {matches.map((m) => {
+          const s = localScores[m.id] ?? { home: "", away: "" };
+          return (
+            <MatchPredictionCard
+              key={m.id}
+              match={m}
+              tm={tm}
+              locked={isLocked(league, m)}
+              prediction={predByMatch.get(m.id)}
+              result={resByMatch.get(m.id)}
+              localHome={s.home}
+              localAway={s.away}
+              onChange={onChange}
+            />
+          );
+        })}
+      </div>
+
+      {!boardLocked && matches.length > 0 && (
+        <div className="sticky bottom-0 z-10 -mx-4 border-t bg-background/90 px-4 py-3 backdrop-blur">
+          <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
+            <span className="text-sm text-muted-foreground">
+              {filled} of {total} predictions filled
+            </span>
+            <Button
+              className="w-full sm:w-auto"
+              onClick={saveAll}
+              disabled={saving || !dirty}
+            >
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4" />
+              )}
+              Save all predictions
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MatchPredictionCard({
   match,
   tm,
   locked,
   prediction,
   result,
+  localHome,
+  localAway,
+  onChange,
 }: {
-  token: string;
   match: any;
   tm: Record<string, any>;
   locked: boolean;
   prediction?: any;
   result?: any;
+  localHome: string;
+  localAway: string;
+  onChange: (matchId: string, home: string, away: string) => void;
 }) {
-  const queryClient = useQueryClient();
-  const saveFn = useServerFn(savePlayerPrediction);
-  const [home, setHome] = useState<string>(
-    prediction?.home_score?.toString() ?? "",
-  );
-  const [away, setAway] = useState<string>(
-    prediction?.away_score?.toString() ?? "",
-  );
-  const [saving, setSaving] = useState(false);
-
   const hasResult = result != null;
   const breakdown =
     hasResult && prediction
@@ -209,25 +324,6 @@ function MatchPredictionCard({
           result.away_score,
         )
       : null;
-
-  async function save() {
-    const h = parseInt(home, 10);
-    const a = parseInt(away, 10);
-    if (Number.isNaN(h) || Number.isNaN(a)) {
-      toast.error("Enter a score for both teams.");
-      return;
-    }
-    setSaving(true);
-    try {
-      await saveFn({ data: { token, matchId: match.id, homeScore: h, awayScore: a } });
-      await queryClient.invalidateQueries({ queryKey: ["player-board", token] });
-      toast.success("Prediction saved");
-    } catch (e: any) {
-      toast.error(e?.message ?? "Could not save prediction");
-    } finally {
-      setSaving(false);
-    }
-  }
 
   return (
     <Card className="glass-card p-4">
@@ -248,17 +344,29 @@ function MatchPredictionCard({
           <Input
             inputMode="numeric"
             className="h-11 w-12 text-center font-display text-lg font-bold"
-            value={home}
+            value={localHome}
             disabled={locked}
-            onChange={(e) => setHome(e.target.value.replace(/\D/g, "").slice(0, 2))}
+            onChange={(e) =>
+              onChange(
+                match.id,
+                e.target.value.replace(/\D/g, "").slice(0, 2),
+                localAway,
+              )
+            }
           />
           <span className="text-muted-foreground">-</span>
           <Input
             inputMode="numeric"
             className="h-11 w-12 text-center font-display text-lg font-bold"
-            value={away}
+            value={localAway}
             disabled={locked}
-            onChange={(e) => setAway(e.target.value.replace(/\D/g, "").slice(0, 2))}
+            onChange={(e) =>
+              onChange(
+                match.id,
+                localHome,
+                e.target.value.replace(/\D/g, "").slice(0, 2),
+              )
+            }
           />
         </div>
         <TeamLabel team={tm[match.away_team_id]} align="right" />
@@ -290,16 +398,6 @@ function MatchPredictionCard({
             </Badge>
           )}
         </div>
-        {!locked && (
-          <Button size="sm" onClick={save} disabled={saving}>
-            {saving ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Check className="h-4 w-4" />
-            )}
-            Save
-          </Button>
-        )}
       </div>
     </Card>
   );
