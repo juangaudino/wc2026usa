@@ -323,6 +323,22 @@ function TournamentsPanel() {
         </div>
       </Card>
 
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => cleanOrphanMutation.mutate()}
+          disabled={cleanOrphanMutation.isPending}
+        >
+          {cleanOrphanMutation.isPending ? (
+            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+          ) : (
+            <Trash2 className="mr-1 h-4 w-4" />
+          )}
+          Clean orphan results
+        </Button>
+      </div>
+
       {rows.length === 0 ? (
         <Empty icon={Trophy} text="No base tournaments yet." />
       ) : (
