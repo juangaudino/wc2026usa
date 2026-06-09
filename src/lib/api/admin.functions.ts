@@ -99,9 +99,7 @@ export const ownerGenerateWorldCup2026 = createServerFn({ method: "POST" })
     const admin = await ctx();
     const { assertOwner, slugify } = await import("./authz.server");
     await assertOwner(admin, context.userId);
-    const { WC2026_TEAMS, buildWorldCup2026Matches, WC2026_BONUS } = await import(
-      "@/lib/wc2026-fixtures"
-    );
+    const { WC2026_BONUS } = await import("@/lib/wc2026-fixtures");
 
     const slug = "world-cup-2026";
     const { data: existing } = await admin
@@ -122,7 +120,7 @@ export const ownerGenerateWorldCup2026 = createServerFn({ method: "POST" })
       slug,
       sport_type: "football",
       season: "2026",
-      description: "FIFA World Cup 2026 — 48 teams, 12 groups across North America.",
+      description: "FIFA World Cup 2026 empty template — upload teams and fixtures to build the tournament.",
       status: "published",
       theme_id: theme?.id ?? null,
       default_exact_points: data?.defaultExactPoints ?? 3,
@@ -156,40 +154,7 @@ export const ownerGenerateWorldCup2026 = createServerFn({ method: "POST" })
       base = created;
     }
 
-    // Teams
-    const { data: teamRows, error: teamErr } = await admin
-      .from("teams")
-      .insert(
-        WC2026_TEAMS.map((t) => ({
-          base_tournament_id: base.id,
-          name: t.name,
-          short_code: t.short_code,
-          flag_emoji: t.flag_emoji,
-          group_name: t.group_name,
-        })),
-      )
-      .select("id, short_code");
-    if (teamErr) throw new Error(teamErr.message);
-    const byCode = new Map((teamRows ?? []).map((t: any) => [t.short_code, t.id]));
-
-    // Matches
-    const matches = buildWorldCup2026Matches();
-    const { error: matchErr } = await admin.from("matches").insert(
-      matches.map((m) => ({
-        base_tournament_id: base.id,
-        home_team_id: byCode.get(m.homeShort),
-        away_team_id: byCode.get(m.awayShort),
-        stage: m.stage,
-        group_name: m.group_name,
-        match_time: m.match_time,
-        venue: m.venue,
-        city: m.city,
-        status: "scheduled",
-      })),
-    );
-    if (matchErr) throw new Error(matchErr.message);
-
-    return { ok: true, baseTournamentId: base.id, teams: teamRows?.length ?? 0, matches: matches.length };
+    return { ok: true, baseTournamentId: base.id, teams: 0, matches: 0 };
   });
 
 export const ownerListThemes = createServerFn({ method: "POST" })
