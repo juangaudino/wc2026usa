@@ -12,6 +12,8 @@ import {
   ArrowLeft,
   Crown,
   Check,
+  Upload,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,9 +23,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TeamLabel } from "@/components/app/team-label";
 import { fmtMatchTime, teamMap } from "@/lib/format";
+import { parsePredictionText, type ParsedParticipant } from "@/lib/import-parser";
 import {
   getLeagueManage,
   addParticipant,
@@ -31,6 +35,7 @@ import {
   setLeagueLock,
   setMatchResult,
   setBonusCorrect,
+  importPredictionsForLeague,
 } from "@/lib/api/admin.functions";
 
 export const Route = createFileRoute("/_authenticated/league/$id")({
@@ -109,12 +114,16 @@ function ManageLeague() {
         <Tabs defaultValue="players" className="mt-6">
           <TabsList>
             <TabsTrigger value="players">Players</TabsTrigger>
+            <TabsTrigger value="import">Import</TabsTrigger>
             <TabsTrigger value="results">Results</TabsTrigger>
             <TabsTrigger value="bonus">Bonus answers</TabsTrigger>
           </TabsList>
 
           <TabsContent value="players" className="mt-4">
             <PlayersPanel leagueId={id} data={data} />
+          </TabsContent>
+          <TabsContent value="import" className="mt-4">
+            <ImportPanel leagueId={id} />
           </TabsContent>
           <TabsContent value="results" className="mt-4">
             <ResultsPanel leagueId={id} data={data} />
@@ -124,6 +133,149 @@ function ManageLeague() {
           </TabsContent>
         </Tabs>
       </main>
+    </div>
+  );
+}
+
+function ImportPanel({ leagueId }: { leagueId: string }) {
+  const qc = useQueryClient();
+  const importFn = useServerFn(importPredictionsForLeague);
+  const [text, setText] = useState("");
+  const [parsed, setParsed] = useState<ParsedParticipant[] | null>(null);
+  const [skipped, setSkipped] = useState<Set<string>>(new Set());
+
+  function rowKey(pi: number, pri: number) {
+    return `${pi}:${pri}`;
+  }
+
+  function preview() {
+    const result = parsePredictionText(text);
+    setParsed(result);
+    setSkipped(new Set());
+    if (result.length === 0) toast.error("No predictions found in the pasted text.");
+  }
+
+  function toggleSkip(key: string) {
+    setSkipped((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  // Build the payload, honoring manual skips.
+  function buildPayload(): ParsedParticipant[] {
+    if (!parsed) return [];
+    return parsed
+      .map((p, pi) => ({
+        name: p.name,
+        predictions: p.predictions.filter((_, pri) => !skipped.has(rowKey(pi, pri))),
+      }))
+      .filter((p) => p.predictions.length > 0);
+  }
+
+  const doImport = useMutation({
+    mutationFn: () => importFn({ data: { leagueId, participants: buildPayload() } }),
+    onSuccess: (res: any) => {
+      qc.invalidateQueries({ queryKey: ["league-manage", leagueId] });
+      toast.success(
+        `Imported ${res.importedPredictions} predictions for ${res.importedPlayers} players`,
+      );
+      setText("");
+      setParsed(null);
+      setSkipped(new Set());
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Import failed"),
+  });
+
+  return (
+    <div className="space-y-4">
+      <Card className="glass-card space-y-3 p-4">
+        <Label className="text-xs">Paste predictions</Label>
+        <Textarea
+          rows={8}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={"Juan\nArgentina 2-0 Japan\nBrazil 1-1 Spain\n\nMaria\nFrance vs Mexico\n3-1"}
+          className="font-mono text-sm"
+        />
+        <div className="flex justify-end">
+          <Button onClick={preview} disabled={!text.trim()}>
+            <Upload className="mr-1 h-4 w-4" /> Preview
+          </Button>
+        </div>
+      </Card>
+
+      {parsed && parsed.length > 0 && (
+        <div className="space-y-4">
+          {parsed.map((p, pi) => (
+            <Card key={pi} className="glass-card p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="font-semibold">{p.name}</p>
+                <Badge variant="outline">{p.predictions.length} predictions</Badge>
+              </div>
+              <div className="space-y-2">
+                {p.predictions.map((pred, pri) => {
+                  const key = rowKey(pi, pri);
+                  const isSkipped = skipped.has(key);
+                  const warn = pred.needsReview;
+                  return (
+                    <div
+                      key={pri}
+                      className={`flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm ${
+                        isSkipped
+                          ? "border-muted bg-muted/30 opacity-60"
+                          : warn
+                            ? "border-yellow-500/40 bg-yellow-500/10"
+                            : "border-green-500/40 bg-green-500/10"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {warn && <AlertTriangle className="h-4 w-4 text-yellow-500" />}
+                        <span>
+                          {pred.homeTeam}{" "}
+                          <span className="font-display font-bold">
+                            {pred.homeScore ?? "?"}-{pred.awayScore ?? "?"}
+                          </span>{" "}
+                          {pred.awayTeam}
+                        </span>
+                        <Badge variant="outline" className="text-[10px]">
+                          {pred.confidence}
+                        </Badge>
+                      </div>
+                      {warn ? (
+                        <Badge variant="outline" className="text-[10px] text-yellow-500">
+                          Needs review — skipped
+                        </Badge>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => toggleSkip(key)}
+                        >
+                          {isSkipped ? "Include" : "Skip"}
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          ))}
+
+          <div className="flex justify-end">
+            <Button onClick={() => doImport.mutate()} disabled={doImport.isPending}>
+              {doImport.isPending ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="mr-1 h-4 w-4" />
+              )}
+              Confirm Import
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

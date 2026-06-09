@@ -457,6 +457,148 @@ export const setMatchResult = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/* -------------------------- BULK IMPORT --------------------------- */
+const importInput = z.object({
+  leagueId: z.string().uuid(),
+  participants: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(120),
+        predictions: z
+          .array(
+            z.object({
+              homeTeam: z.string().min(1).max(80),
+              awayTeam: z.string().min(1).max(80),
+              homeScore: z.number().int().min(0).max(99).nullable(),
+              awayScore: z.number().int().min(0).max(99).nullable(),
+              raw: z.string().max(400).optional(),
+              confidence: z.enum(["high", "medium", "low"]).optional(),
+              needsReview: z.boolean(),
+            }),
+          )
+          .max(500),
+      }),
+    )
+    .min(1)
+    .max(200),
+});
+
+function normName(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+export const importPredictionsForLeague = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(importInput)
+  .handler(async ({ context, data }) => {
+    const admin = await ctx();
+    const { assertApprovedManager, assertLeagueAccess } = await import("./authz.server");
+    await assertApprovedManager(admin, context.userId);
+    const league = await assertLeagueAccess(admin, context.userId, data.leagueId);
+    const baseTournamentId = (league as any).base_tournament_id;
+
+    // Teams lookup: normalized name + short_code -> team id.
+    const { data: teams } = await admin
+      .from("teams")
+      .select("id, name, short_code")
+      .eq("base_tournament_id", baseTournamentId);
+    const teamByKey = new Map<string, string>();
+    for (const t of teams ?? []) {
+      if (t.name) teamByKey.set(normName(t.name), t.id);
+      if (t.short_code) teamByKey.set(normName(t.short_code), t.id);
+    }
+
+    // Matches lookup: unordered team pair -> { matchId, homeTeamId }.
+    const { data: matches } = await admin
+      .from("matches")
+      .select("id, home_team_id, away_team_id")
+      .eq("base_tournament_id", baseTournamentId);
+    const matchByPair = new Map<string, { matchId: string; homeTeamId: string }>();
+    for (const m of matches ?? []) {
+      if (!m.home_team_id || !m.away_team_id) continue;
+      const key = [m.home_team_id, m.away_team_id].sort().join("|");
+      matchByPair.set(key, { matchId: m.id, homeTeamId: m.home_team_id });
+    }
+
+    // Existing participants by normalized name.
+    const { data: existingParts } = await admin
+      .from("league_participants")
+      .select("id, name")
+      .eq("league_id", data.leagueId);
+    const partByName = new Map<string, string>();
+    for (const p of existingParts ?? []) partByName.set(normName(p.name), p.id);
+
+    const { makeToken } = await import("./authz.server");
+
+    let importedPredictions = 0;
+    let importedPlayers = 0;
+    const rows: {
+      participant_id: string;
+      league_id: string;
+      match_id: string;
+      home_score: number;
+      away_score: number;
+    }[] = [];
+
+    for (const participant of data.participants) {
+      const usable = participant.predictions.filter(
+        (p) => !p.needsReview && p.homeScore !== null && p.awayScore !== null,
+      );
+      if (usable.length === 0) continue;
+
+      // Find or create participant.
+      let participantId = partByName.get(normName(participant.name));
+      if (!participantId) {
+        const { data: created, error } = await admin
+          .from("league_participants")
+          .insert({ league_id: data.leagueId, name: participant.name })
+          .select("id")
+          .single();
+        if (error) throw new Error(error.message);
+        participantId = created.id;
+        partByName.set(normName(participant.name), participantId);
+        await admin.from("player_links").insert({
+          participant_id: participantId,
+          league_id: data.leagueId,
+          token: makeToken(),
+        });
+      }
+      importedPlayers++;
+
+      for (const pred of usable) {
+        const homeId = teamByKey.get(normName(pred.homeTeam));
+        const awayId = teamByKey.get(normName(pred.awayTeam));
+        if (!homeId || !awayId) continue;
+        const found = matchByPair.get([homeId, awayId].sort().join("|"));
+        if (!found) continue;
+        // Orient scores to the match's actual home team.
+        const homeScore = found.homeTeamId === homeId ? pred.homeScore! : pred.awayScore!;
+        const awayScore = found.homeTeamId === homeId ? pred.awayScore! : pred.homeScore!;
+        rows.push({
+          participant_id: participantId,
+          league_id: data.leagueId,
+          match_id: found.matchId,
+          home_score: homeScore,
+          away_score: awayScore,
+        });
+        importedPredictions++;
+      }
+    }
+
+    if (rows.length) {
+      const { error } = await admin
+        .from("match_predictions")
+        .upsert(rows, { onConflict: "participant_id,match_id" });
+      if (error) throw new Error(error.message);
+    }
+
+    return { ok: true, importedPredictions, importedPlayers };
+  });
+
 export const setBonusCorrect = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
