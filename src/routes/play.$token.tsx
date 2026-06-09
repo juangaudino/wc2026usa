@@ -363,3 +363,161 @@ function BonusCard({
     </Card>
   );
 }
+
+function PredictionLeaguePanel({
+  playerName,
+  stats,
+  leaderboard,
+}: {
+  playerName: string;
+  stats?: { totalPoints: number; exactHits: number; tendencyHits: number; rank: number; pendingMatches: number };
+  leaderboard: Array<{ name: string; totalPoints: number; exactHits: number; tendencyHits: number; rank: number; isCurrent?: boolean }>;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Users className="h-5 w-5 text-primary" />
+        <h2 className="font-display text-xl font-bold">Prediction League Standings</h2>
+      </div>
+
+      {stats && (
+        <Card className="glass-card p-4">
+          <p className="text-sm text-muted-foreground">Your standing</p>
+          <div className="mt-2 grid grid-cols-4 gap-2 text-center">
+            <div>
+              <p className="font-display text-2xl font-bold">#{stats.rank}</p>
+              <p className="text-xs text-muted-foreground">Rank</p>
+            </div>
+            <div>
+              <p className="font-display text-2xl font-bold">{stats.totalPoints}</p>
+              <p className="text-xs text-muted-foreground">Points</p>
+            </div>
+            <div>
+              <p className="font-display text-2xl font-bold">{stats.exactHits}</p>
+              <p className="text-xs text-muted-foreground">Exact</p>
+            </div>
+            <div>
+              <p className="font-display text-2xl font-bold">{stats.tendencyHits}</p>
+              <p className="text-xs text-muted-foreground">Tendency</p>
+            </div>
+          </div>
+          {stats.pendingMatches > 0 && (
+            <p className="mt-3 text-center text-xs text-muted-foreground">
+              {stats.pendingMatches} match{stats.pendingMatches === 1 ? "" : "es"} still to predict
+            </p>
+          )}
+        </Card>
+      )}
+
+      <Card className="glass-card overflow-x-auto p-0">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-left text-xs text-muted-foreground">
+              <th className="px-3 py-2">Rank</th>
+              <th className="px-3 py-2">Player</th>
+              <th className="px-3 py-2 text-center">Points</th>
+              <th className="px-3 py-2 text-center">Exact</th>
+              <th className="px-3 py-2 text-center">Tendency</th>
+            </tr>
+          </thead>
+          <tbody>
+            {leaderboard.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-3 py-4 text-center text-muted-foreground">
+                  No standings yet.
+                </td>
+              </tr>
+            )}
+            {leaderboard.map((row) => {
+              const mine = row.isCurrent ?? row.name === playerName;
+              return (
+                <tr
+                  key={`${row.rank}-${row.name}`}
+                  className={`border-b last:border-0 ${mine ? "bg-primary/10 font-semibold" : ""}`}
+                >
+                  <td className="px-3 py-2">{row.rank}</td>
+                  <td className="px-3 py-2">{row.name}{mine && " (you)"}</td>
+                  <td className="px-3 py-2 text-center font-display font-bold">{row.totalPoints}</td>
+                  <td className="px-3 py-2 text-center">{row.exactHits}</td>
+                  <td className="px-3 py-2 text-center">{row.tendencyHits}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </Card>
+    </div>
+  );
+}
+
+function TournamentPanel({
+  standings,
+}: {
+  standings: Array<{
+    group: string;
+    team: string;
+    played: number;
+    wins: number;
+    draws: number;
+    losses: number;
+    goalsFor: number;
+    goalsAgainst: number;
+    goalDiff: number;
+    points: number;
+  }>;
+}) {
+  const groups = Array.from(new Set(standings.map((s) => s.group)));
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Trophy className="h-5 w-5 text-primary" />
+        <h2 className="font-display text-xl font-bold">Tournament Standings</h2>
+      </div>
+
+      {standings.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          No results yet — standings will appear once matches are played.
+        </p>
+      )}
+
+      {groups.map((g) => (
+        <Card key={g} className="glass-card overflow-x-auto p-0">
+          <div className="border-b px-3 py-2 text-sm font-semibold">{g}</div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-xs text-muted-foreground">
+                <th className="px-3 py-2">Team</th>
+                <th className="px-2 py-2 text-center">P</th>
+                <th className="px-2 py-2 text-center">W</th>
+                <th className="px-2 py-2 text-center">D</th>
+                <th className="px-2 py-2 text-center">L</th>
+                <th className="px-2 py-2 text-center">GF</th>
+                <th className="px-2 py-2 text-center">GA</th>
+                <th className="px-2 py-2 text-center">GD</th>
+                <th className="px-2 py-2 text-center">Pts</th>
+              </tr>
+            </thead>
+            <tbody>
+              {standings
+                .filter((s) => s.group === g)
+                .map((s) => (
+                  <tr key={s.team} className="border-b last:border-0">
+                    <td className="px-3 py-2">{s.team}</td>
+                    <td className="px-2 py-2 text-center">{s.played}</td>
+                    <td className="px-2 py-2 text-center">{s.wins}</td>
+                    <td className="px-2 py-2 text-center">{s.draws}</td>
+                    <td className="px-2 py-2 text-center">{s.losses}</td>
+                    <td className="px-2 py-2 text-center">{s.goalsFor}</td>
+                    <td className="px-2 py-2 text-center">{s.goalsAgainst}</td>
+                    <td className="px-2 py-2 text-center">{s.goalDiff}</td>
+                    <td className="px-2 py-2 text-center font-display font-bold">{s.points}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </Card>
+      ))}
+    </div>
+  );
+}
