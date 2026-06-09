@@ -62,6 +62,7 @@ function PublicLeague() {
 
   const prevRank = new Map((board?.previous ?? []).map((r: any) => [r.participantId, r.rank]));
   const rows = board?.rows ?? [];
+  const standings = computeGroupStandings(data.teams, data.matches, data.results);
 
   return (
     <div className="min-h-screen" style={themeStyleVars(base?.themes)}>
@@ -78,8 +79,6 @@ function PublicLeague() {
         </Badge>
         <h1 className="mt-2 font-display text-3xl font-bold">{league.name}</h1>
         <p className="mt-1 text-muted-foreground">{base?.name}</p>
-
-        const standings = computeGroupStandings(data.teams, data.matches, data.results);
 
         <Tabs defaultValue="leaderboard" className="mt-6">
           <TabsList>
