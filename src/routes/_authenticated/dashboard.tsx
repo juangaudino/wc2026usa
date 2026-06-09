@@ -327,6 +327,10 @@ function TournamentsPanel() {
                 </Select>
               </div>
             </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <ImportTeamsModal baseTournamentId={t.id} />
+              <ImportMatchesModal baseTournamentId={t.id} />
+            </div>
           </Card>
         ))
       )}
