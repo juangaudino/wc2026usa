@@ -86,7 +86,16 @@ export const ownerListBaseTournaments = createServerFn({ method: "POST" })
 
 export const ownerGenerateWorldCup2026 = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator(
+    z
+      .object({
+        defaultExactPoints: z.number().int().min(0).max(1000).optional(),
+        defaultTendencyPoints: z.number().int().min(0).max(1000).optional(),
+        defaultIncorrectPoints: z.number().int().min(-1000).max(1000).optional(),
+      })
+      .optional(),
+  )
+  .handler(async ({ context, data }) => {
     const admin = await ctx();
     const { assertOwner, slugify } = await import("./authz.server");
     await assertOwner(admin, context.userId);
