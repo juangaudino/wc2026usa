@@ -134,6 +134,7 @@ function PublicLeague() {
             )}
             {(data.matches as any[]).map((m) => {
               const res = resByMatch.get(m.id) as any;
+              const isKnockout = !m.home_team_id && !m.away_team_id;
               return (
                 <Card key={m.id} className="glass-card p-4">
                   <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
@@ -142,13 +143,24 @@ function PublicLeague() {
                       {m.group_name ? `Group ${m.group_name}` : m.stage}
                     </span>
                   </div>
-                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-                    <TeamLabel team={tm[m.home_team_id]} />
-                    <div className="font-display text-lg font-bold">
-                      {res ? `${res.home_score} - ${res.away_score}` : "vs"}
+                  {isKnockout ? (
+                    <div className="text-center font-display text-lg font-bold">
+                      {m.label || "TBD"}
                     </div>
-                    <TeamLabel team={tm[m.away_team_id]} align="right" />
-                  </div>
+                  ) : (
+                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                      <TeamLabel team={tm[m.home_team_id]} />
+                      <div className="font-display text-lg font-bold">
+                        {res ? `${res.home_score} - ${res.away_score}` : "vs"}
+                      </div>
+                      <TeamLabel team={tm[m.away_team_id]} align="right" />
+                    </div>
+                  )}
+                  {m.venue && (
+                    <p className="mt-2 text-center text-xs text-muted-foreground">
+                      {m.venue}{m.city ? ` · ${m.city}` : ""}
+                    </p>
+                  )}
                 </Card>
               );
             })}

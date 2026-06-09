@@ -457,6 +457,7 @@ export type Database = {
           group_name: string | null
           home_team_id: string | null
           id: string
+          label: string | null
           match_time: string | null
           stage: string
           status: string
@@ -472,6 +473,7 @@ export type Database = {
           group_name?: string | null
           home_team_id?: string | null
           id?: string
+          label?: string | null
           match_time?: string | null
           stage?: string
           status?: string
@@ -487,6 +489,7 @@ export type Database = {
           group_name?: string | null
           home_team_id?: string | null
           id?: string
+          label?: string | null
           match_time?: string | null
           stage?: string
           status?: string
