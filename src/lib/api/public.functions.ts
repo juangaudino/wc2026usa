@@ -113,6 +113,152 @@ export const getPlayerBoard = createServerFn({ method: "GET" })
     const { data: scoring } = await supabaseAdmin
       .from("scoring_rules").select("*").eq("league_id", league.id).maybeSingle();
 
+    // ---- Standings (computed) ----
+    const { scorePrediction, tendencyOf } = await import("@/lib/scoring");
+    const cfg = {
+      exactScorePoints: scoring?.exact_score_points ?? 3,
+      tendencyPoints: scoring?.tendency_points ?? 1,
+      incorrectPoints: scoring?.incorrect_points ?? 0,
+    };
+    const resMap = new Map(
+      (results ?? []).map((r: any) => [r.match_id, r]),
+    );
+
+    // a. Prediction-league leaderboard across all participants.
+    const { data: allParticipants } = await supabaseAdmin
+      .from("league_participants")
+      .select("id, name")
+      .eq("league_id", league.id);
+    const { data: allPreds } = await supabaseAdmin
+      .from("match_predictions")
+      .select("participant_id, match_id, home_score, away_score")
+      .eq("league_id", league.id);
+
+    const statsByPart = new Map<string, { name: string; totalPoints: number; exactHits: number; tendencyHits: number }>();
+    for (const p of allParticipants ?? []) {
+      statsByPart.set(p.id, { name: p.name, totalPoints: 0, exactHits: 0, tendencyHits: 0 });
+    }
+    for (const pred of allPreds ?? []) {
+      const res = resMap.get(pred.match_id);
+      const entry = statsByPart.get(pred.participant_id);
+      if (!res || !entry) continue;
+      const b = scorePrediction(pred.home_score, pred.away_score, res.home_score, res.away_score, cfg);
+      entry.totalPoints += b.points;
+      if (b.outcome === "exact") entry.exactHits += 1;
+      else if (b.outcome === "tendency") entry.tendencyHits += 1;
+    }
+    const leaderboard = Array.from(statsByPart.entries())
+      .map(([id, s]) => ({ id, ...s }))
+      .sort(
+        (x, y) =>
+          y.totalPoints - x.totalPoints ||
+          y.exactHits - x.exactHits ||
+          x.name.localeCompare(y.name),
+      )
+      .map((row, i) => ({
+        name: row.name,
+        totalPoints: row.totalPoints,
+        exactHits: row.exactHits,
+        tendencyHits: row.tendencyHits,
+        rank: i + 1,
+        isCurrent: row.id === participant.id,
+      }));
+
+    // b. Tournament group standings from real results.
+    const teamById = new Map((teams.data ?? []).map((t: any) => [t.id, t]));
+    type Standing = {
+      group: string;
+      teamId: string;
+      team: string;
+      played: number;
+      wins: number;
+      draws: number;
+      losses: number;
+      goalsFor: number;
+      goalsAgainst: number;
+      goalDiff: number;
+      points: number;
+    };
+    const standingMap = new Map<string, Standing>();
+    function ensureStanding(group: string, teamId: string): Standing | null {
+      const t = teamById.get(teamId);
+      if (!t) return null;
+      const key = `${group}::${teamId}`;
+      let s = standingMap.get(key);
+      if (!s) {
+        s = {
+          group,
+          teamId,
+          team: t.name,
+          played: 0,
+          wins: 0,
+          draws: 0,
+          losses: 0,
+          goalsFor: 0,
+          goalsAgainst: 0,
+          goalDiff: 0,
+          points: 0,
+        };
+        standingMap.set(key, s);
+      }
+      return s;
+    }
+    for (const m of matches.data ?? []) {
+      const res = resMap.get(m.id);
+      if (!res || !m.home_team_id || !m.away_team_id) continue;
+      const group =
+        m.group_name ?? teamById.get(m.home_team_id)?.group_name ?? "Other";
+      const home = ensureStanding(group, m.home_team_id);
+      const away = ensureStanding(group, m.away_team_id);
+      if (!home || !away) continue;
+      home.played += 1;
+      away.played += 1;
+      home.goalsFor += res.home_score;
+      home.goalsAgainst += res.away_score;
+      away.goalsFor += res.away_score;
+      away.goalsAgainst += res.home_score;
+      const t = tendencyOf(res.home_score, res.away_score);
+      if (t === "home") {
+        home.wins += 1;
+        home.points += 3;
+        away.losses += 1;
+      } else if (t === "away") {
+        away.wins += 1;
+        away.points += 3;
+        home.losses += 1;
+      } else {
+        home.draws += 1;
+        away.draws += 1;
+        home.points += 1;
+        away.points += 1;
+      }
+    }
+    const groupStandings = Array.from(standingMap.values())
+      .map((s) => ({ ...s, goalDiff: s.goalsFor - s.goalsAgainst }))
+      .sort(
+        (a, b) =>
+          a.group.localeCompare(b.group) ||
+          b.points - a.points ||
+          b.goalDiff - a.goalDiff ||
+          b.goalsFor - a.goalsFor ||
+          a.team.localeCompare(b.team),
+      )
+      .map(({ teamId, ...rest }) => rest);
+
+    // c. Current participant summary.
+    const me = leaderboard.find((r) => r.isCurrent);
+    const predictedMatchIds = new Set((mpreds.data ?? []).map((p: any) => p.match_id));
+    const pendingMatches = (matches.data ?? []).filter(
+      (m: any) => !predictedMatchIds.has(m.id),
+    ).length;
+    const currentParticipantStats = {
+      totalPoints: me?.totalPoints ?? 0,
+      exactHits: me?.exactHits ?? 0,
+      tendencyHits: me?.tendencyHits ?? 0,
+      rank: me?.rank ?? leaderboard.length + 1,
+      pendingMatches,
+    };
+
     return {
       league,
       base,
@@ -124,6 +270,9 @@ export const getPlayerBoard = createServerFn({ method: "GET" })
       bonusRules: bonusRules.data ?? [],
       results: results ?? [],
       scoring,
+      leaderboard,
+      groupStandings,
+      currentParticipantStats,
     };
   });
 
