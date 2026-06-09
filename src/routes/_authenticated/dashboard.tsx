@@ -267,7 +267,7 @@ function TournamentsPanel() {
       }),
     onSuccess: (r: any) => {
       qc.invalidateQueries({ queryKey: ["owner-bases"] });
-      toast.success(`World Cup 2026 created — ${r.teams} teams, ${r.matches} matches.`);
+      toast.success(`Empty World Cup 2026 template ready — ${r.teams} teams, ${r.matches} matches.`);
     },
     onError: (e: any) => toast.error(e?.message ?? "Failed"),
   });
