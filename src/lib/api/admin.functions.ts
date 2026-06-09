@@ -756,12 +756,11 @@ export const ownerImportTeams = createServerFn({ method: "POST" })
     const { assertOwner } = await import("./authz.server");
     await assertOwner(admin, context.userId);
 
-    const { data: existing } = await admin
-      .from("teams")
-      .select("id, short_code")
-      .eq("base_tournament_id", data.baseTournamentId);
+    await admin.from("matches").delete().eq("base_tournament_id", data.baseTournamentId);
+    await admin.from("teams").delete().eq("base_tournament_id", data.baseTournamentId);
+
     const byCode = new Map(
-      (existing ?? []).map((t: any) => [String(t.short_code).toLowerCase(), t.id]),
+      [] as [string, string][],
     );
 
     let inserted = 0;
@@ -790,7 +789,7 @@ export const ownerImportTeams = createServerFn({ method: "POST" })
         inserted += 1;
       }
     }
-    return { inserted, updated };
+    return { inserted, updated, replaced: true };
   });
 
 export const ownerImportMatches = createServerFn({ method: "POST" })
