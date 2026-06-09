@@ -121,6 +121,7 @@ function ManageLeague() {
             <TabsTrigger value="import">Import</TabsTrigger>
             <TabsTrigger value="results">Results</TabsTrigger>
             <TabsTrigger value="bonus">Bonus answers</TabsTrigger>
+            <TabsTrigger value="rules">Rules</TabsTrigger>
           </TabsList>
 
           <TabsContent value="players" className="mt-4">
@@ -134,6 +135,9 @@ function ManageLeague() {
           </TabsContent>
           <TabsContent value="bonus" className="mt-4">
             <BonusPanel leagueId={id} data={data} />
+          </TabsContent>
+          <TabsContent value="rules" className="mt-4">
+            <RulesPanel leagueId={id} data={data} />
           </TabsContent>
         </Tabs>
       </main>
