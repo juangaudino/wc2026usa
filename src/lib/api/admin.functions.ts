@@ -182,9 +182,7 @@ export const ownerGenerateWorldCup2026 = createServerFn({ method: "POST" })
 
     let base: { id: string };
     if (existing) {
-      // Regenerate cleanly: wipe old fixtures, results and predictions for this
-      // tournament (FK cascade removes match_results / match_predictions), then
-      // rebuild from scratch while keeping any existing leagues attached.
+      // Reset cleanly to an empty World Cup template while keeping existing leagues attached.
       await clearTournamentTeamsAndMatches(admin, existing.id);
       const { error: updErr } = await admin
         .from("base_tournaments")
@@ -819,9 +817,7 @@ export const ownerImportTeams = createServerFn({ method: "POST" })
 
     await clearTournamentTeamsAndMatches(admin, data.baseTournamentId);
 
-    const byCode = new Map(
-      [] as [string, string][],
-    );
+    const byCode = new Map<string, string>();
 
     let inserted = 0;
     let updated = 0;
@@ -903,9 +899,7 @@ export const ownerImportMatches = createServerFn({ method: "POST" })
     await clearTournamentMatches(admin, data.baseTournamentId);
 
     const matchKey = (h: string, a: string) => `${h}::${a}`;
-    const byPair = new Map(
-      [] as [string, string][],
-    );
+    const byPair = new Map<string, string>();
 
     let inserted = 0;
     let updated = 0;
