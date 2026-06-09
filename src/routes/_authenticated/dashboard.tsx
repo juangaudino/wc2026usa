@@ -15,6 +15,9 @@ import {
   Wand2,
   Clock,
   ArrowRight,
+  Pencil,
+  Trash2,
+
 } from "lucide-react";
 import { toast } from "sonner";
 
