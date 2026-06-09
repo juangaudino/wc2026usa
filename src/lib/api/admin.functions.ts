@@ -1083,4 +1083,3 @@ export const ownerCleanOrphanResults = createServerFn({ method: "POST" })
 
     return { deleted: toDelete.length + orphanMatchIds.length + predsToDelete.length };
   });
-  });
