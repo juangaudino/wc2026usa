@@ -181,16 +181,7 @@ export const ownerGenerateWorldCup2026 = createServerFn({ method: "POST" })
       // Regenerate cleanly: wipe old fixtures, results and predictions for this
       // tournament (FK cascade removes match_results / match_predictions), then
       // rebuild from scratch while keeping any existing leagues attached.
-      const { error: matchDeleteErr } = await admin
-        .from("matches")
-        .delete()
-        .eq("base_tournament_id", existing.id);
-      if (matchDeleteErr) throw new Error(matchDeleteErr.message);
-      const { error: teamDeleteErr } = await admin
-        .from("teams")
-        .delete()
-        .eq("base_tournament_id", existing.id);
-      if (teamDeleteErr) throw new Error(teamDeleteErr.message);
+      await clearTournamentTeamsAndMatches(admin, existing.id);
       const { error: updErr } = await admin
         .from("base_tournaments")
         .update(baseFields)
@@ -809,8 +800,7 @@ export const ownerImportTeams = createServerFn({ method: "POST" })
     const { assertOwner } = await import("./authz.server");
     await assertOwner(admin, context.userId);
 
-    await admin.from("matches").delete().eq("base_tournament_id", data.baseTournamentId);
-    await admin.from("teams").delete().eq("base_tournament_id", data.baseTournamentId);
+    await clearTournamentTeamsAndMatches(admin, data.baseTournamentId);
 
     const byCode = new Map(
       [] as [string, string][],
@@ -879,7 +869,7 @@ export const ownerImportMatches = createServerFn({ method: "POST" })
       (teams ?? []).map((t: any) => [String(t.short_code).toLowerCase(), t.id]),
     );
 
-    await admin.from("matches").delete().eq("base_tournament_id", data.baseTournamentId);
+    await clearTournamentMatches(admin, data.baseTournamentId);
 
     const matchKey = (h: string, a: string) => `${h}::${a}`;
     const byPair = new Map(
