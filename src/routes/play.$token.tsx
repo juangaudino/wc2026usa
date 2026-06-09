@@ -382,17 +382,17 @@ function MatchPredictionCard({
           {breakdown && (
             <Badge
               className={
-                breakdown.outcome === "exact"
+                breakdown.outcome === "perfect"
                   ? "bg-primary text-primary-foreground"
-                  : breakdown.outcome === "tendency"
+                  : breakdown.outcome === "result"
                     ? "bg-accent text-accent-foreground"
                     : "bg-secondary"
               }
             >
-              {breakdown.outcome === "exact"
-                ? "Exact score"
-                : breakdown.outcome === "tendency"
-                  ? "Correct tendency"
+              {breakdown.outcome === "perfect"
+                ? "Perfect score"
+                : breakdown.outcome === "result"
+                  ? "Correct result"
                   : "Missed"}{" "}
               +{breakdown.points}
             </Badge>
