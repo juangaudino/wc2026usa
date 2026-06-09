@@ -25,6 +25,10 @@ function PublicLeague() {
   const { slug } = Route.useParams();
   const fetchLeague = useServerFn(getPublicLeague);
   const fetchBoard = useServerFn(getLeagueLeaderboard);
+  const [isAuthed, setIsAuthed] = useState(false);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setIsAuthed(!!data.user));
+  }, []);
   const { data } = useQuery({
     queryKey: ["public-league", slug],
     queryFn: () => fetchLeague({ data: { slug } }),
