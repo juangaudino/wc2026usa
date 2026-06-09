@@ -169,7 +169,8 @@ function OwnerDashboard() {
         <TabsContent value="themes" className="mt-5">
           <ThemesPanel />
         </TabsContent>
-        <TabsContent value="leagues" className="mt-5">
+        <TabsContent value="leagues" className="mt-5 space-y-8">
+          <OwnerAllLeaguesPanel />
           <ManagerDashboard />
         </TabsContent>
       </Tabs>
