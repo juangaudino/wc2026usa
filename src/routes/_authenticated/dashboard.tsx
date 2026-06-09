@@ -73,6 +73,7 @@ import {
   deleteLeague,
   ownerUpdateBaseTournament,
   ownerDeleteBaseTournament,
+  ownerCleanOrphanResults,
   listBaseTournamentsForManager,
   listMyLeagues,
   createLeague,

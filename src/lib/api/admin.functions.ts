@@ -1015,3 +1015,23 @@ export const ownerDeleteBaseTournament = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+export const ownerCleanOrphanResults = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const admin = await ctx();
+    const { assertOwner } = await import("./authz.server");
+    await assertOwner(admin, context.userId);
+    const { data: orphans } = await admin
+      .from("match_results")
+      .select("id, match_id");
+    const { data: validMatches } = await admin.from("matches").select("id");
+    const validIds = new Set((validMatches ?? []).map((m: any) => m.id));
+    const toDelete = (orphans ?? [])
+      .filter((r: any) => !validIds.has(r.match_id))
+      .map((r: any) => r.id);
+    if (toDelete.length > 0) {
+      await admin.from("match_results").delete().in("id", toDelete);
+    }
+    return { deleted: toDelete.length };
+  });
