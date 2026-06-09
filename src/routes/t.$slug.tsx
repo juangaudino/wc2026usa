@@ -201,3 +201,159 @@ function Movement({ move }: { move: number }) {
     );
   return <Minus className="h-4 w-4 text-muted-foreground" />;
 }
+
+function computeGroupStandings(teams: any[], matches: any[], results: any[]) {
+  const teamById = new Map(teams.map((t) => [t.id, t]));
+  const resMap = new Map(results.map((r) => [r.match_id, r]));
+
+  type Standing = {
+    group: string;
+    teamId: string;
+    team: string;
+    flagEmoji?: string | null;
+    played: number;
+    wins: number;
+    draws: number;
+    losses: number;
+    goalsFor: number;
+    goalsAgainst: number;
+    goalDiff: number;
+    points: number;
+  };
+
+  const standingMap = new Map<string, Standing>();
+
+  function ensureStanding(group: string, teamId: string): Standing | null {
+    const t = teamById.get(teamId);
+    if (!t) return null;
+    const key = `${group}::${teamId}`;
+    let s = standingMap.get(key);
+    if (!s) {
+      s = {
+        group,
+        teamId,
+        team: t.name,
+        flagEmoji: t.flag_emoji,
+        played: 0,
+        wins: 0,
+        draws: 0,
+        losses: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        goalDiff: 0,
+        points: 0,
+      };
+      standingMap.set(key, s);
+    }
+    return s;
+  }
+
+  for (const m of matches) {
+    const res = resMap.get(m.id);
+    if (!res || !m.home_team_id || !m.away_team_id) continue;
+    const group =
+      m.group_name ?? teamById.get(m.home_team_id)?.group_name ?? "Other";
+    const home = ensureStanding(group, m.home_team_id);
+    const away = ensureStanding(group, m.away_team_id);
+    if (!home || !away) continue;
+    home.played += 1;
+    away.played += 1;
+    home.goalsFor += res.home_score;
+    home.goalsAgainst += res.away_score;
+    away.goalsFor += res.away_score;
+    away.goalsAgainst += res.home_score;
+    const t = tendencyOf(res.home_score, res.away_score);
+    if (t === "home") {
+      home.wins += 1;
+      home.points += 3;
+      away.losses += 1;
+    } else if (t === "away") {
+      away.wins += 1;
+      away.points += 3;
+      home.losses += 1;
+    } else {
+      home.draws += 1;
+      away.draws += 1;
+      home.points += 1;
+      away.points += 1;
+    }
+  }
+
+  return Array.from(standingMap.values())
+    .map((s) => ({ ...s, goalDiff: s.goalsFor - s.goalsAgainst }))
+    .sort(
+      (a, b) =>
+        a.group.localeCompare(b.group) ||
+        b.points - a.points ||
+        b.goalDiff - a.goalDiff ||
+        b.goalsFor - a.goalsFor ||
+        a.team.localeCompare(b.team),
+    );
+}
+
+function GroupTables({
+  standings,
+}: {
+  standings: Array<{
+    group: string;
+    team: string;
+    flagEmoji?: string | null;
+    played: number;
+    wins: number;
+    draws: number;
+    losses: number;
+    goalsFor: number;
+    goalsAgainst: number;
+    goalDiff: number;
+    points: number;
+  }>;
+}) {
+  const groups = Array.from(new Set(standings.map((s) => s.group)));
+
+  return (
+    <>
+      {groups.map((g) => (
+        <Card key={g} className="glass-card overflow-x-auto p-0">
+          <div className="border-b px-3 py-2 text-sm font-semibold">{g}</div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-xs text-muted-foreground">
+                <th className="px-3 py-2">Team</th>
+                <th className="px-2 py-2 text-center">P</th>
+                <th className="px-2 py-2 text-center">W</th>
+                <th className="px-2 py-2 text-center">D</th>
+                <th className="px-2 py-2 text-center">L</th>
+                <th className="px-2 py-2 text-center">GF</th>
+                <th className="px-2 py-2 text-center">GA</th>
+                <th className="px-2 py-2 text-center">GD</th>
+                <th className="px-2 py-2 text-center">Pts</th>
+              </tr>
+            </thead>
+            <tbody>
+              {standings
+                .filter((s) => s.group === g)
+                .map((s) => (
+                  <tr key={s.team} className="border-b last:border-0">
+                    <td className="px-3 py-2">
+                      {s.flagEmoji ? `${s.flagEmoji} ` : ""}
+                      {s.team}
+                    </td>
+                    <td className="px-2 py-2 text-center">{s.played}</td>
+                    <td className="px-2 py-2 text-center">{s.wins}</td>
+                    <td className="px-2 py-2 text-center">{s.draws}</td>
+                    <td className="px-2 py-2 text-center">{s.losses}</td>
+                    <td className="px-2 py-2 text-center">{s.goalsFor}</td>
+                    <td className="px-2 py-2 text-center">{s.goalsAgainst}</td>
+                    <td className="px-2 py-2 text-center">{s.goalDiff}</td>
+                    <td className="px-2 py-2 text-center font-display font-bold">
+                      {s.points}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </Card>
+      ))}
+    </>
+  );
+}
