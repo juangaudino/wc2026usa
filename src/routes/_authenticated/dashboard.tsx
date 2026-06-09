@@ -251,21 +251,37 @@ function TournamentsPanel() {
   const rows = data ?? [];
   return (
     <div className="space-y-4">
-      <Card className="glass-card flex items-center justify-between p-4">
-        <div>
-          <p className="font-semibold">Generate official tournament</p>
-          <p className="text-sm text-muted-foreground">
-            Build World Cup 2026 with all 48 teams and group-stage fixtures.
-          </p>
+      <Card className="glass-card p-4">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="font-semibold">Generate official tournament</p>
+            <p className="text-sm text-muted-foreground">
+              Build World Cup 2026 with all 48 teams and group-stage fixtures.
+            </p>
+          </div>
+          <Button onClick={() => generate.mutate()} disabled={generate.isPending}>
+            {generate.isPending ? (
+              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+            ) : (
+              <Wand2 className="mr-1 h-4 w-4" />
+            )}
+            Generate WC 2026
+          </Button>
         </div>
-        <Button onClick={() => generate.mutate()} disabled={generate.isPending}>
-          {generate.isPending ? (
-            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-          ) : (
-            <Wand2 className="mr-1 h-4 w-4" />
-          )}
-          Generate WC 2026
-        </Button>
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid gap-1.5">
+            <Label htmlFor="def-exact">Default exact pts</Label>
+            <Input id="def-exact" type="number" value={defExact} onChange={(e) => setDefExact(e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="def-tendency">Default tendency pts</Label>
+            <Input id="def-tendency" type="number" value={defTendency} onChange={(e) => setDefTendency(e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="def-incorrect">Default incorrect pts</Label>
+            <Input id="def-incorrect" type="number" value={defIncorrect} onChange={(e) => setDefIncorrect(e.target.value)} />
+          </div>
+        </div>
       </Card>
 
       {rows.length === 0 ? (
