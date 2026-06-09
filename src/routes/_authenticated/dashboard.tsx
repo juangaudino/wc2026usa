@@ -249,6 +249,7 @@ function TournamentsPanel() {
   const gen = useServerFn(ownerGenerateWorldCup2026);
   const listThemes = useServerFn(ownerListThemes);
   const assign = useServerFn(ownerAssignTheme);
+  const cleanOrphans = useServerFn(ownerCleanOrphanResults);
   const { data } = useQuery({ queryKey: ["owner-bases"], queryFn: () => list() });
   const { data: themes } = useQuery({ queryKey: ["owner-themes"], queryFn: () => listThemes() });
 
