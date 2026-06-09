@@ -1,13 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { Trophy, ShieldCheck, Target, Medal, ArrowRight, Sparkles } from "lucide-react";
+import { Trophy, ShieldCheck, Target, Medal, ArrowRight, Sparkles, Users } from "lucide-react";
 
 import heroImg from "@/assets/hero-stadium.jpg";
 import { SiteHeader } from "@/components/app/site-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { themeStyleVars } from "@/lib/theme";
 import { listPublicTournaments } from "@/lib/api/public.functions";
 
 export const Route = createFileRoute("/")({
@@ -25,18 +26,22 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const fetchTournaments = useServerFn(listPublicTournaments);
-  const { data: tournaments } = useQuery({
+  const fetchData = useServerFn(listPublicTournaments);
+  const { data } = useQuery({
     queryKey: ["public-tournaments"],
-    queryFn: () => fetchTournaments(),
+    queryFn: () => fetchData(),
   });
 
+  const tournaments = data?.tournaments ?? [];
+  const leagues = data?.leagues ?? [];
+  const activeTheme = tournaments.find((t) => t.themes)?.themes as any;
+
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen" style={themeStyleVars(activeTheme)}>
       <SiteHeader
         right={
           <Button asChild variant="ghost" size="sm">
-            <Link to="/admin">Admin</Link>
+            <Link to="/dashboard">Manager login</Link>
           </Button>
         }
       />
@@ -66,12 +71,12 @@ function Index() {
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild size="lg">
-              <a href="#tournaments">
-                Browse tournaments <ArrowRight className="ml-1 h-4 w-4" />
+              <a href="#leagues">
+                Browse leagues <ArrowRight className="ml-1 h-4 w-4" />
               </a>
             </Button>
             <Button asChild size="lg" variant="outline">
-              <Link to="/admin">Run a league</Link>
+              <Link to="/dashboard">Run a league</Link>
             </Button>
           </div>
         </div>
@@ -98,32 +103,44 @@ function Index() {
       </section>
 
       {/* Tournaments */}
-      <section id="tournaments" className="mx-auto max-w-6xl px-4 py-16">
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="font-display text-2xl font-bold">Active tournaments</h2>
-        </div>
-
-        {tournaments && tournaments.length > 0 ? (
+      {tournaments.length > 0 && (
+        <section className="mx-auto max-w-6xl px-4 pt-16">
+          <h2 className="mb-6 font-display text-2xl font-bold">Tournaments</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {tournaments.map((t) => (
-              <Link key={t.id} to="/t/$slug" params={{ slug: t.slug }} className="group">
+              <Card key={t.id} className="glass-card p-5">
+                <div className="flex items-center justify-between">
+                  <Badge variant="outline" className="capitalize">{t.sport_type}</Badge>
+                  {t.season && <span className="text-xs text-muted-foreground">{t.season}</span>}
+                </div>
+                <h3 className="mt-4 font-display text-xl font-bold">{t.name}</h3>
+                {t.description && (
+                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{t.description}</p>
+                )}
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Public leagues */}
+      <section id="leagues" className="mx-auto max-w-6xl px-4 py-16">
+        <h2 className="mb-6 font-display text-2xl font-bold">Public leagues</h2>
+
+        {leagues.length > 0 ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {leagues.map((l: any) => (
+              <Link key={l.id} to="/t/$slug" params={{ slug: l.slug }} className="group">
                 <Card className="glass-card h-full overflow-hidden p-5 transition-all hover:border-primary/50 hover:shadow-xl">
-                  <div className="flex items-center justify-between">
-                    <Badge variant="outline" className="capitalize">{t.sport_type}</Badge>
-                    {t.predictions_locked ? (
-                      <Badge variant="secondary">Locked</Badge>
-                    ) : (
-                      <Badge className="bg-accent text-accent-foreground">Open</Badge>
-                    )}
-                  </div>
+                  <Badge variant="secondary" className="gap-1">
+                    <Users className="h-3 w-3" /> League
+                  </Badge>
                   <h3 className="mt-4 font-display text-xl font-bold group-hover:text-primary">
-                    {t.name}
+                    {l.name}
                   </h3>
-                  {t.description && (
-                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{t.description}</p>
-                  )}
                   <div className="mt-4 flex items-center text-sm font-medium text-primary">
-                    View tournament <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                    View leaderboard{" "}
+                    <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
                   </div>
                 </Card>
               </Link>
@@ -132,9 +149,9 @@ function Index() {
         ) : (
           <Card className="glass-card flex flex-col items-center gap-3 p-12 text-center">
             <ShieldCheck className="h-10 w-10 text-muted-foreground" />
-            <p className="text-muted-foreground">No tournaments yet.</p>
+            <p className="text-muted-foreground">No public leagues yet.</p>
             <Button asChild>
-              <Link to="/admin">Create the first one</Link>
+              <Link to="/dashboard">Create the first one</Link>
             </Button>
           </Card>
         )}
