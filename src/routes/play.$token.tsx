@@ -233,8 +233,12 @@ function MatchPredictionCard({
     <Card className="glass-card p-4">
       <div className="mb-3 flex items-center justify-between text-xs text-muted-foreground">
         <span>{fmtMatchTime(match.match_time)}</span>
-        <span className="flex items-center gap-2 capitalize">
-          {match.stage}
+        <span className="flex items-center gap-2">
+          {match.group_name
+            ? `Group ${match.group_name}`
+            : match.stage
+              ? <span className="capitalize">{match.stage}</span>
+              : null}
           {locked && <Lock className="h-3 w-3" />}
         </span>
       </div>
