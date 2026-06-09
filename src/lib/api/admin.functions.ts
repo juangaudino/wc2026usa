@@ -109,7 +109,6 @@ export const ownerGenerateWorldCup2026 = createServerFn({ method: "POST" })
       .select("id")
       .eq("slug", slug)
       .maybeSingle();
-    if (existing) throw new Error("World Cup 2026 already exists.");
 
     // Attach the WC2026 theme if present.
     const { data: theme } = await admin
@@ -118,26 +117,44 @@ export const ownerGenerateWorldCup2026 = createServerFn({ method: "POST" })
       .eq("name", "World Cup 2026")
       .maybeSingle();
 
-    const { data: base, error: baseErr } = await admin
-      .from("base_tournaments")
-      .insert({
-        name: "World Cup 2026",
-        slug,
-        sport_type: "football",
-        season: "2026",
-        description: "FIFA World Cup 2026 — 48 teams, 12 groups across North America.",
-        status: "published",
-        theme_id: theme?.id ?? null,
-        default_exact_points: data?.defaultExactPoints ?? 3,
-        default_tendency_points: data?.defaultTendencyPoints ?? 1,
-        default_incorrect_points: data?.defaultIncorrectPoints ?? 0,
-        default_bonus: WC2026_BONUS,
-        starts_at: "2026-06-11T16:00:00.000Z",
-        created_by: context.userId,
-      })
-      .select("id")
-      .single();
-    if (baseErr) throw new Error(baseErr.message);
+    const baseFields = {
+      name: "World Cup 2026",
+      slug,
+      sport_type: "football",
+      season: "2026",
+      description: "FIFA World Cup 2026 — 48 teams, 12 groups across North America.",
+      status: "published",
+      theme_id: theme?.id ?? null,
+      default_exact_points: data?.defaultExactPoints ?? 3,
+      default_tendency_points: data?.defaultTendencyPoints ?? 1,
+      default_incorrect_points: data?.defaultIncorrectPoints ?? 0,
+      default_bonus: WC2026_BONUS,
+      starts_at: "2026-06-11T16:00:00.000Z",
+      created_by: context.userId,
+    };
+
+    let base: { id: string };
+    if (existing) {
+      // Regenerate cleanly: wipe old fixtures, results and predictions for this
+      // tournament (FK cascade removes match_results / match_predictions), then
+      // rebuild from scratch while keeping any existing leagues attached.
+      await admin.from("matches").delete().eq("base_tournament_id", existing.id);
+      await admin.from("teams").delete().eq("base_tournament_id", existing.id);
+      const { error: updErr } = await admin
+        .from("base_tournaments")
+        .update(baseFields)
+        .eq("id", existing.id);
+      if (updErr) throw new Error(updErr.message);
+      base = { id: existing.id };
+    } else {
+      const { data: created, error: baseErr } = await admin
+        .from("base_tournaments")
+        .insert(baseFields)
+        .select("id")
+        .single();
+      if (baseErr) throw new Error(baseErr.message);
+      base = created;
+    }
 
     // Teams
     const { data: teamRows, error: teamErr } = await admin
