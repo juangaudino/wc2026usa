@@ -36,7 +36,7 @@ function AuthPage() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      const account = await fetchAccount({ data: {} });
+      const account = await fetchAccount();
       if (account.role === "platform_owner") {
         toast.error("Please use /owner/login");
         await supabase.auth.signOut();
