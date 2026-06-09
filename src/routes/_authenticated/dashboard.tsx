@@ -53,6 +53,8 @@ import {
   ownerListThemes,
   ownerSaveTheme,
   ownerAssignTheme,
+  ownerImportTeams,
+  ownerImportMatches,
   listBaseTournamentsForManager,
   listMyLeagues,
   createLeague,
