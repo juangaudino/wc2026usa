@@ -293,10 +293,10 @@ function TournamentsPanel() {
       <Card className="glass-card p-4">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="font-semibold">Generate official tournament</p>
+            <p className="font-semibold">Create empty World Cup template</p>
             <p className="text-sm text-muted-foreground">
-              Build World Cup 2026 with all 48 teams and group-stage fixtures.
-              Regenerating replaces old fixtures and clears previous results.
+              Create or reset the World Cup 2026 structure without teams or fixtures.
+              Uploading teams and fixtures afterwards replaces the current tournament data.
             </p>
           </div>
           <Button onClick={() => generate.mutate()} disabled={generate.isPending}>
@@ -305,7 +305,7 @@ function TournamentsPanel() {
             ) : (
               <Wand2 className="mr-1 h-4 w-4" />
             )}
-            Generate WC 2026
+            Create empty WC 2026
           </Button>
         </div>
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -447,7 +447,7 @@ function ImportTeamsModal({ baseTournamentId }: { baseTournamentId: string }) {
     mutationFn: () => importTeams({ data: { baseTournamentId, teams: rows } }),
     onSuccess: (r: any) => {
       qc.invalidateQueries({ queryKey: ["owner-bases"] });
-      toast.success(`Teams imported — ${r.inserted} added, ${r.updated} updated.`);
+      toast.success(`Teams imported — ${r.inserted} loaded. Previous teams, fixtures and results were cleared.`);
       setOpen(false);
       setRaw("");
       setRows([]);
@@ -467,7 +467,7 @@ function ImportTeamsModal({ baseTournamentId }: { baseTournamentId: string }) {
           <DialogTitle>Import Teams</DialogTitle>
         </DialogHeader>
         <p className="text-xs text-muted-foreground">
-          Paste a JSON array or CSV with header: name,short_code,flag_emoji,group_name
+          Paste a JSON array or CSV with header: name,short_code,flag_emoji,group_name. This replaces all existing teams and clears fixtures/results for this tournament.
         </p>
         <Textarea
           rows={6}
@@ -555,7 +555,7 @@ function ImportMatchesModal({ baseTournamentId }: { baseTournamentId: string }) 
     mutationFn: () => importMatches({ data: { baseTournamentId, matches: rows } }),
     onSuccess: (r: any) => {
       qc.invalidateQueries({ queryKey: ["owner-bases"] });
-      toast.success(`Matches imported — ${r.inserted} added, ${r.updated} updated.`);
+      toast.success(`Matches imported — ${r.inserted} loaded. Previous fixtures and results were cleared.`);
       if (r.errors?.length) {
         toast.error(`${r.errors.length} row(s) skipped: ${r.errors[0]}`);
       }
