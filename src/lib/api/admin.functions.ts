@@ -826,13 +826,11 @@ export const ownerImportMatches = createServerFn({ method: "POST" })
       (teams ?? []).map((t: any) => [String(t.short_code).toLowerCase(), t.id]),
     );
 
-    const { data: existing } = await admin
-      .from("matches")
-      .select("id, home_team_id, away_team_id")
-      .eq("base_tournament_id", data.baseTournamentId);
+    await admin.from("matches").delete().eq("base_tournament_id", data.baseTournamentId);
+
     const matchKey = (h: string, a: string) => `${h}::${a}`;
     const byPair = new Map(
-      (existing ?? []).map((m: any) => [matchKey(m.home_team_id, m.away_team_id), m.id]),
+      [] as [string, string][],
     );
 
     let inserted = 0;
@@ -878,7 +876,7 @@ export const ownerImportMatches = createServerFn({ method: "POST" })
         inserted += 1;
       }
     }
-    return { inserted, updated, errors };
+    return { inserted, updated, errors, replaced: true };
   });
 
 /* ----------------------------- OWNER LEAGUE/TOURNAMENT MGMT ----------------------------- */
