@@ -36,6 +36,10 @@ import {
   setMatchResult,
   setBonusCorrect,
   importPredictionsForLeague,
+  saveScoringRules,
+  upsertBonusRule,
+  deleteBonusRule,
+  clearBonusRules,
 } from "@/lib/api/admin.functions";
 
 export const Route = createFileRoute("/_authenticated/league/$id")({
