@@ -12,6 +12,8 @@ import {
   ArrowLeft,
   Crown,
   Check,
+  Upload,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,9 +23,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TeamLabel } from "@/components/app/team-label";
 import { fmtMatchTime, teamMap } from "@/lib/format";
+import { parsePredictionText, type ParsedParticipant } from "@/lib/import-parser";
 import {
   getLeagueManage,
   addParticipant,
@@ -31,6 +35,7 @@ import {
   setLeagueLock,
   setMatchResult,
   setBonusCorrect,
+  importPredictionsForLeague,
 } from "@/lib/api/admin.functions";
 
 export const Route = createFileRoute("/_authenticated/league/$id")({
