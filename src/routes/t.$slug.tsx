@@ -248,6 +248,11 @@ function computeGroupStandings(teams: any[], matches: any[], results: any[]) {
     return s;
   }
 
+  // Seed all teams first so every group/team shows from day 1 (0 results).
+  for (const t of teams) {
+    ensureStanding(t.group_name ?? "Other", t.id);
+  }
+
   for (const m of matches) {
     const res = resMap.get(m.id);
     if (!res || !m.home_team_id || !m.away_team_id) continue;

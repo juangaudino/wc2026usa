@@ -34,6 +34,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { themeStyleVars } from "@/lib/theme";
 import { getMyAccount } from "@/lib/api/admin.functions";
 import {
@@ -44,6 +53,8 @@ import {
   ownerListThemes,
   ownerSaveTheme,
   ownerAssignTheme,
+  ownerImportTeams,
+  ownerImportMatches,
   listBaseTournamentsForManager,
   listMyLeagues,
   createLeague,
@@ -316,10 +327,262 @@ function TournamentsPanel() {
                 </Select>
               </div>
             </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <ImportTeamsModal baseTournamentId={t.id} />
+              <ImportMatchesModal baseTournamentId={t.id} />
+            </div>
           </Card>
         ))
       )}
     </div>
+  );
+}
+
+function parseCsv(text: string): Record<string, string>[] {
+  const lines = text
+    .trim()
+    .split(/\r?\n/)
+    .filter((l) => l.trim().length > 0);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+  return lines.slice(1).map((line) => {
+    const cells = line.split(",");
+    const obj: Record<string, string> = {};
+    headers.forEach((h, i) => {
+      obj[h] = (cells[i] ?? "").trim();
+    });
+    return obj;
+  });
+}
+
+function parseImport(text: string): any[] {
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+  if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+    const parsed = JSON.parse(trimmed);
+    return Array.isArray(parsed) ? parsed : [parsed];
+  }
+  return parseCsv(trimmed);
+}
+
+function ImportTeamsModal({ baseTournamentId }: { baseTournamentId: string }) {
+  const qc = useQueryClient();
+  const importTeams = useServerFn(ownerImportTeams);
+  const [open, setOpen] = useState(false);
+  const [raw, setRaw] = useState("");
+  const [rows, setRows] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  function preview() {
+    try {
+      const parsed = parseImport(raw)
+        .map((r) => ({
+          name: r.name ?? "",
+          short_code: r.short_code ?? "",
+          flag_emoji: r.flag_emoji ?? "",
+          group_name: r.group_name ?? "",
+        }))
+        .filter((r) => r.name && r.short_code);
+      if (parsed.length === 0) {
+        setError("No valid rows found. Need at least name and short_code.");
+        setRows([]);
+        return;
+      }
+      setError(null);
+      setRows(parsed);
+    } catch (e: any) {
+      setError(e?.message ?? "Could not parse input");
+      setRows([]);
+    }
+  }
+
+  const save = useMutation({
+    mutationFn: () => importTeams({ data: { baseTournamentId, teams: rows } }),
+    onSuccess: (r: any) => {
+      qc.invalidateQueries({ queryKey: ["owner-bases"] });
+      toast.success(`Teams imported — ${r.inserted} added, ${r.updated} updated.`);
+      setOpen(false);
+      setRaw("");
+      setRows([]);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Plus className="mr-1 h-4 w-4" /> Import Teams
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Import Teams</DialogTitle>
+        </DialogHeader>
+        <p className="text-xs text-muted-foreground">
+          Paste a JSON array or CSV with header: name,short_code,flag_emoji,group_name
+        </p>
+        <Textarea
+          rows={6}
+          value={raw}
+          onChange={(e) => setRaw(e.target.value)}
+          placeholder={`name,short_code,flag_emoji,group_name\nArgentina,ARG,🇦🇷,A`}
+        />
+        <Button variant="secondary" size="sm" onClick={preview}>
+          Preview
+        </Button>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        {rows.length > 0 && (
+          <div className="max-h-48 overflow-auto rounded border">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b text-left text-muted-foreground">
+                  <th className="px-2 py-1">Name</th>
+                  <th className="px-2 py-1">Code</th>
+                  <th className="px-2 py-1">Flag</th>
+                  <th className="px-2 py-1">Group</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={i} className="border-b last:border-0">
+                    <td className="px-2 py-1">{r.name}</td>
+                    <td className="px-2 py-1">{r.short_code}</td>
+                    <td className="px-2 py-1">{r.flag_emoji}</td>
+                    <td className="px-2 py-1">{r.group_name}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <DialogFooter>
+          <Button
+            onClick={() => save.mutate()}
+            disabled={rows.length === 0 || save.isPending}
+          >
+            {save.isPending && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+            Confirm Import ({rows.length})
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ImportMatchesModal({ baseTournamentId }: { baseTournamentId: string }) {
+  const qc = useQueryClient();
+  const importMatches = useServerFn(ownerImportMatches);
+  const [open, setOpen] = useState(false);
+  const [raw, setRaw] = useState("");
+  const [rows, setRows] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  function preview() {
+    try {
+      const parsed = parseImport(raw)
+        .map((r) => ({
+          home: r.home ?? "",
+          away: r.away ?? "",
+          group_name: r.group_name ?? "",
+          stage: r.stage ?? "",
+          match_time: r.match_time ?? "",
+          venue: r.venue ?? "",
+          city: r.city ?? "",
+        }))
+        .filter((r) => r.home && r.away);
+      if (parsed.length === 0) {
+        setError("No valid rows found. Need at least home and away.");
+        setRows([]);
+        return;
+      }
+      setError(null);
+      setRows(parsed);
+    } catch (e: any) {
+      setError(e?.message ?? "Could not parse input");
+      setRows([]);
+    }
+  }
+
+  const save = useMutation({
+    mutationFn: () => importMatches({ data: { baseTournamentId, matches: rows } }),
+    onSuccess: (r: any) => {
+      qc.invalidateQueries({ queryKey: ["owner-bases"] });
+      toast.success(`Matches imported — ${r.inserted} added, ${r.updated} updated.`);
+      if (r.errors?.length) {
+        toast.error(`${r.errors.length} row(s) skipped: ${r.errors[0]}`);
+      }
+      setOpen(false);
+      setRaw("");
+      setRows([]);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Plus className="mr-1 h-4 w-4" /> Import Matches
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Import Matches</DialogTitle>
+        </DialogHeader>
+        <p className="text-xs text-muted-foreground">
+          Paste JSON or CSV with header: home,away,group_name,stage,match_time,venue,city.
+          Teams matched by short_code.
+        </p>
+        <Textarea
+          rows={6}
+          value={raw}
+          onChange={(e) => setRaw(e.target.value)}
+          placeholder={`home,away,group_name,stage,match_time,venue,city\nARG,BRA,A,group,2026-06-11T18:00:00Z,MetLife,New York`}
+        />
+        <Button variant="secondary" size="sm" onClick={preview}>
+          Preview
+        </Button>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        {rows.length > 0 && (
+          <div className="max-h-48 overflow-auto rounded border">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b text-left text-muted-foreground">
+                  <th className="px-2 py-1">Home</th>
+                  <th className="px-2 py-1">Away</th>
+                  <th className="px-2 py-1">Group</th>
+                  <th className="px-2 py-1">Stage</th>
+                  <th className="px-2 py-1">Time</th>
+                  <th className="px-2 py-1">Venue</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={i} className="border-b last:border-0">
+                    <td className="px-2 py-1">{r.home}</td>
+                    <td className="px-2 py-1">{r.away}</td>
+                    <td className="px-2 py-1">{r.group_name}</td>
+                    <td className="px-2 py-1">{r.stage}</td>
+                    <td className="px-2 py-1">{r.match_time}</td>
+                    <td className="px-2 py-1">{r.venue}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <DialogFooter>
+          <Button
+            onClick={() => save.mutate()}
+            disabled={rows.length === 0 || save.isPending}
+          >
+            {save.isPending && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+            Confirm Import ({rows.length})
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
