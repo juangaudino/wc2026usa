@@ -29,11 +29,19 @@ function AuthPage() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const fetchAccount = useServerFn(getMyAccount);
+
   async function signIn() {
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      const account = await fetchAccount({ data: {} });
+      if (account.role === "platform_owner") {
+        toast.error("Please use /owner/login");
+        await supabase.auth.signOut();
+        return;
+      }
       router.navigate({ to: "/dashboard" });
     } catch (e: any) {
       toast.error(e?.message ?? "Could not sign in");
