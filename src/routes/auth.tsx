@@ -1,6 +1,8 @@
-import { createFileRoute, useRouter, redirect } from "@tanstack/react-router";
+import { createFileRoute, useRouter, redirect, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Loader2, Trophy } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { getMyAccount } from "@/lib/api/admin.functions";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
