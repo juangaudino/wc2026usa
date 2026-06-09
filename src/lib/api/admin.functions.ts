@@ -22,6 +22,8 @@ async function clearTournamentTeamsAndMatches(admin: any, baseTournamentId: stri
   if (matchLookupErr) throw new Error(matchLookupErr.message);
   const matchIds = (matches ?? []).map((m: any) => m.id);
   if (matchIds.length > 0) {
+    const { error: logErr } = await admin.from("result_change_log").delete().in("match_id", matchIds);
+    if (logErr) throw new Error(logErr.message);
     const { error: predErr } = await admin.from("match_predictions").delete().in("match_id", matchIds);
     if (predErr) throw new Error(predErr.message);
     const { error: resultErr } = await admin.from("match_results").delete().in("match_id", matchIds);
@@ -47,6 +49,8 @@ async function clearTournamentMatches(admin: any, baseTournamentId: string) {
   if (matchLookupErr) throw new Error(matchLookupErr.message);
   const matchIds = (matches ?? []).map((m: any) => m.id);
   if (matchIds.length > 0) {
+    const { error: logErr } = await admin.from("result_change_log").delete().in("match_id", matchIds);
+    if (logErr) throw new Error(logErr.message);
     const { error: predErr } = await admin.from("match_predictions").delete().in("match_id", matchIds);
     if (predErr) throw new Error(predErr.message);
     const { error: resultErr } = await admin.from("match_results").delete().in("match_id", matchIds);
