@@ -508,3 +508,192 @@ function BonusRow({ leagueId, rule }: { leagueId: string; rule: any }) {
     </Card>
   );
 }
+
+function RulesPanel({ leagueId, data }: { leagueId: string; data: any }) {
+  const qc = useQueryClient();
+  const scoring = data?.scoring ?? null;
+  const [exact, setExact] = useState<string>(String(scoring?.exact_score_points ?? 3));
+  const [tendency, setTendency] = useState<string>(String(scoring?.tendency_points ?? 1));
+  const [incorrect, setIncorrect] = useState<string>(String(scoring?.incorrect_points ?? 0));
+
+  const saveScoreFn = useServerFn(saveScoringRules);
+  const saveScore = useMutation({
+    mutationFn: () =>
+      saveScoreFn({
+        data: {
+          leagueId,
+          exactScorePoints: Number(exact) || 0,
+          tendencyPoints: Number(tendency) || 0,
+          incorrectPoints: Number(incorrect) || 0,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Scoring rules saved");
+      qc.invalidateQueries({ queryKey: ["league-manage", leagueId] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Failed to save"),
+  });
+
+  return (
+    <div className="grid gap-6 md:grid-cols-2">
+      <Card className="p-5">
+        <h3 className="text-lg font-semibold">Scoring Rules</h3>
+        <p className="mt-1 text-sm text-muted-foreground">Points awarded per match prediction.</p>
+        <div className="mt-4 grid gap-3">
+          <div className="grid gap-1.5">
+            <Label htmlFor="sr-exact">Exact score (pts)</Label>
+            <Input id="sr-exact" type="number" value={exact} onChange={(e) => setExact(e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="sr-tendency">Correct tendency (pts)</Label>
+            <Input id="sr-tendency" type="number" value={tendency} onChange={(e) => setTendency(e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="sr-incorrect">Incorrect (pts)</Label>
+            <Input id="sr-incorrect" type="number" value={incorrect} onChange={(e) => setIncorrect(e.target.value)} />
+          </div>
+          <Button onClick={() => saveScore.mutate()} disabled={saveScore.isPending} className="mt-1 w-fit">
+            Save scoring rules
+          </Button>
+        </div>
+      </Card>
+
+      <BonusRulesEditor leagueId={leagueId} data={data} />
+    </div>
+  );
+}
+
+function BonusRulesEditor({ leagueId, data }: { leagueId: string; data: any }) {
+  const qc = useQueryClient();
+  const rules: any[] = data?.bonusRules ?? [];
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["league-manage", leagueId] });
+
+  const upsertFn = useServerFn(upsertBonusRule);
+  const deleteFn = useServerFn(deleteBonusRule);
+  const clearFn = useServerFn(clearBonusRules);
+
+  const upsert = useMutation({
+    mutationFn: (vars: { id?: string; label: string; points: number; correctValue: string | null }) =>
+      upsertFn({ data: { leagueId, ...vars } }),
+    onSuccess: () => {
+      toast.success("Bonus question saved");
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Failed to save"),
+  });
+  const del = useMutation({
+    mutationFn: (id: string) => deleteFn({ data: { leagueId, id } }),
+    onSuccess: () => {
+      toast.success("Bonus question deleted");
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Failed to delete"),
+  });
+  const clearAll = useMutation({
+    mutationFn: () => clearFn({ data: { leagueId } }),
+    onSuccess: () => {
+      toast.success("All bonus questions removed");
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Failed to remove"),
+  });
+
+  const [newLabel, setNewLabel] = useState("");
+  const [newPoints, setNewPoints] = useState("3");
+  const [newCorrect, setNewCorrect] = useState("");
+
+  return (
+    <Card className="p-5">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Bonus Rules</h3>
+        {rules.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => clearAll.mutate()}
+            disabled={clearAll.isPending}
+          >
+            Remove all bonus
+          </Button>
+        )}
+      </div>
+
+      <div className="mt-4 grid gap-4">
+        {rules.length === 0 && <p className="text-sm text-muted-foreground">No bonus questions yet.</p>}
+        {rules.map((r) => (
+          <BonusRuleRow key={r.id} rule={r} onSave={(v) => upsert.mutate({ id: r.id, ...v })} onDelete={() => del.mutate(r.id)} saving={upsert.isPending} deleting={del.isPending} />
+        ))}
+
+        <div className="rounded-md border border-dashed p-3">
+          <p className="text-sm font-medium">Add bonus question</p>
+          <div className="mt-2 grid gap-2">
+            <Input placeholder="Label" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
+            <div className="grid grid-cols-2 gap-2">
+              <Input type="number" placeholder="Points" value={newPoints} onChange={(e) => setNewPoints(e.target.value)} />
+              <Input placeholder="Correct value" value={newCorrect} onChange={(e) => setNewCorrect(e.target.value)} />
+            </div>
+            <Button
+              size="sm"
+              className="w-fit"
+              disabled={!newLabel.trim() || upsert.isPending}
+              onClick={() =>
+                upsert.mutate(
+                  { label: newLabel.trim(), points: Number(newPoints) || 0, correctValue: newCorrect.trim() || null },
+                  {
+                    onSuccess: () => {
+                      setNewLabel("");
+                      setNewPoints("3");
+                      setNewCorrect("");
+                    },
+                  },
+                )
+              }
+            >
+              Add bonus question
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function BonusRuleRow({
+  rule,
+  onSave,
+  onDelete,
+  saving,
+  deleting,
+}: {
+  rule: any;
+  onSave: (v: { label: string; points: number; correctValue: string | null }) => void;
+  onDelete: () => void;
+  saving: boolean;
+  deleting: boolean;
+}) {
+  const [label, setLabel] = useState(String(rule.label ?? ""));
+  const [points, setPoints] = useState(String(rule.points ?? 0));
+  const [correct, setCorrect] = useState(String(rule.correct_value ?? ""));
+
+  return (
+    <div className="rounded-md border p-3">
+      <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label" />
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <Input type="number" value={points} onChange={(e) => setPoints(e.target.value)} placeholder="Points" />
+        <Input value={correct} onChange={(e) => setCorrect(e.target.value)} placeholder="Correct value" />
+      </div>
+      <div className="mt-2 flex gap-2">
+        <Button
+          size="sm"
+          disabled={!label.trim() || saving}
+          onClick={() => onSave({ label: label.trim(), points: Number(points) || 0, correctValue: correct.trim() || null })}
+        >
+          Save
+        </Button>
+        <Button size="sm" variant="destructive" onClick={onDelete} disabled={deleting}>
+          Delete
+        </Button>
+      </div>
+    </div>
+  );
+}
