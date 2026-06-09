@@ -221,8 +221,18 @@ function TournamentsPanel() {
   const { data } = useQuery({ queryKey: ["owner-bases"], queryFn: () => list() });
   const { data: themes } = useQuery({ queryKey: ["owner-themes"], queryFn: () => listThemes() });
 
+  const [defExact, setDefExact] = useState("3");
+  const [defTendency, setDefTendency] = useState("1");
+  const [defIncorrect, setDefIncorrect] = useState("0");
   const generate = useMutation({
-    mutationFn: () => gen(),
+    mutationFn: () =>
+      gen({
+        data: {
+          defaultExactPoints: Number(defExact) || 0,
+          defaultTendencyPoints: Number(defTendency) || 0,
+          defaultIncorrectPoints: Number(defIncorrect) || 0,
+        },
+      }),
     onSuccess: (r: any) => {
       qc.invalidateQueries({ queryKey: ["owner-bases"] });
       toast.success(`World Cup 2026 created — ${r.teams} teams, ${r.matches} matches.`);
