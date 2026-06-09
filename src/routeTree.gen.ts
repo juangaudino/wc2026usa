@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TSlugRouteImport } from './routes/t.$slug'
 import { Route as PlayTokenRouteImport } from './routes/play.$token'
+import { Route as OwnerLoginRouteImport } from './routes/owner.login'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedLeagueIdRouteImport } from './routes/_authenticated/league.$id'
 
@@ -41,6 +42,11 @@ const PlayTokenRoute = PlayTokenRouteImport.update({
   path: '/play/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OwnerLoginRoute = OwnerLoginRouteImport.update({
+  id: '/owner/login',
+  path: '/owner/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -56,6 +62,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/owner/login': typeof OwnerLoginRoute
   '/play/$token': typeof PlayTokenRoute
   '/t/$slug': typeof TSlugRoute
   '/league/$id': typeof AuthenticatedLeagueIdRoute
@@ -64,6 +71,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/owner/login': typeof OwnerLoginRoute
   '/play/$token': typeof PlayTokenRoute
   '/t/$slug': typeof TSlugRoute
   '/league/$id': typeof AuthenticatedLeagueIdRoute
@@ -74,6 +82,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/owner/login': typeof OwnerLoginRoute
   '/play/$token': typeof PlayTokenRoute
   '/t/$slug': typeof TSlugRoute
   '/_authenticated/league/$id': typeof AuthenticatedLeagueIdRoute
@@ -84,17 +93,26 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/dashboard'
+    | '/owner/login'
     | '/play/$token'
     | '/t/$slug'
     | '/league/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/dashboard' | '/play/$token' | '/t/$slug' | '/league/$id'
+  to:
+    | '/'
+    | '/auth'
+    | '/dashboard'
+    | '/owner/login'
+    | '/play/$token'
+    | '/t/$slug'
+    | '/league/$id'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/dashboard'
+    | '/owner/login'
     | '/play/$token'
     | '/t/$slug'
     | '/_authenticated/league/$id'
@@ -104,6 +122,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  OwnerLoginRoute: typeof OwnerLoginRoute
   PlayTokenRoute: typeof PlayTokenRoute
   TSlugRoute: typeof TSlugRoute
 }
@@ -145,6 +164,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlayTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/owner/login': {
+      id: '/owner/login'
+      path: '/owner/login'
+      fullPath: '/owner/login'
+      preLoaderRoute: typeof OwnerLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -179,6 +205,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  OwnerLoginRoute: OwnerLoginRoute,
   PlayTokenRoute: PlayTokenRoute,
   TSlugRoute: TSlugRoute,
 }

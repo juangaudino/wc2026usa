@@ -1,6 +1,8 @@
-import { createFileRoute, useRouter, redirect } from "@tanstack/react-router";
+import { createFileRoute, useRouter, redirect, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Loader2, Trophy } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { getMyAccount } from "@/lib/api/admin.functions";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -27,11 +29,19 @@ function AuthPage() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const fetchAccount = useServerFn(getMyAccount);
+
   async function signIn() {
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      const account = await fetchAccount();
+      if (account.role === "platform_owner") {
+        toast.error("Please use /owner/login");
+        await supabase.auth.signOut();
+        return;
+      }
       router.navigate({ to: "/dashboard" });
     } catch (e: any) {
       toast.error(e?.message ?? "Could not sign in");
@@ -71,6 +81,12 @@ function AuthPage() {
           <h1 className="mt-3 font-display text-2xl font-bold">Tournament Managers</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Private access for league managers. New accounts need owner approval.
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Manager access. Platform Owner?{" "}
+            <Link to="/owner/login" className="underline underline-offset-2 hover:text-primary">
+              Sign in at /owner/login
+            </Link>
           </p>
         </div>
 
