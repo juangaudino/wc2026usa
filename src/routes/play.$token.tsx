@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TeamLabel } from "@/components/app/team-label";
 import { fmtMatchTime, teamMap } from "@/lib/format";
+import { themeStyleVars } from "@/lib/theme";
 import { scorePrediction } from "@/lib/scoring";
 import {
   getPlayerBoard,
