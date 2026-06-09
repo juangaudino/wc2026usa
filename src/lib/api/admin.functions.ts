@@ -622,3 +622,121 @@ export const setBonusCorrect = createServerFn({ method: "POST" })
     await rebuildLeaderboard(admin, data.leagueId);
     return { ok: true };
   });
+
+/* --------------------------- SCORING RULES --------------------------- */
+export const saveScoringRules = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    z.object({
+      leagueId: z.string().uuid(),
+      exactScorePoints: z.number().int().min(0).max(1000),
+      tendencyPoints: z.number().int().min(0).max(1000),
+      incorrectPoints: z.number().int().min(-1000).max(1000),
+    }),
+  )
+  .handler(async ({ context, data }) => {
+    const admin = await ctx();
+    const { assertLeagueAccess } = await import("./authz.server");
+    await assertLeagueAccess(admin, context.userId, data.leagueId);
+    const { error } = await admin.from("scoring_rules").upsert(
+      {
+        league_id: data.leagueId,
+        name: "Default",
+        exact_score_points: data.exactScorePoints,
+        tendency_points: data.tendencyPoints,
+        incorrect_points: data.incorrectPoints,
+        created_by: context.userId,
+      },
+      { onConflict: "league_id" },
+    );
+    if (error) throw new Error(error.message);
+    const { recomputeLeague, rebuildLeaderboard } = await import("./scoring-engine.server");
+    await recomputeLeague(admin, data.leagueId);
+    await rebuildLeaderboard(admin, data.leagueId);
+    return { ok: true };
+  });
+
+/* --------------------------- BONUS RULES ---------------------------- */
+export const upsertBonusRule = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    z.object({
+      leagueId: z.string().uuid(),
+      id: z.string().uuid().optional(),
+      label: z.string().min(1).max(160),
+      points: z.number().int().min(0).max(1000),
+      correctValue: z.string().max(120).nullable().optional(),
+    }),
+  )
+  .handler(async ({ context, data }) => {
+    const admin = await ctx();
+    const { assertLeagueAccess } = await import("./authz.server");
+    await assertLeagueAccess(admin, context.userId, data.leagueId);
+    const correct = data.correctValue && data.correctValue.length ? data.correctValue : null;
+    if (data.id) {
+      const { error } = await admin
+        .from("bonus_rules")
+        .update({ label: data.label, points: data.points, correct_value: correct })
+        .eq("id", data.id)
+        .eq("league_id", data.leagueId);
+      if (error) throw new Error(error.message);
+    } else {
+      const { data: existing } = await admin
+        .from("bonus_rules")
+        .select("sort_order")
+        .eq("league_id", data.leagueId)
+        .order("sort_order", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nextSort = ((existing as any)?.sort_order ?? -1) + 1;
+      const bonusKey = `bonus_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+      const { error } = await admin.from("bonus_rules").insert({
+        league_id: data.leagueId,
+        bonus_key: bonusKey,
+        label: data.label,
+        input_type: "text",
+        points: data.points,
+        correct_value: correct,
+        sort_order: nextSort,
+      });
+      if (error) throw new Error(error.message);
+    }
+    const { recomputeLeague, rebuildLeaderboard } = await import("./scoring-engine.server");
+    await recomputeLeague(admin, data.leagueId);
+    await rebuildLeaderboard(admin, data.leagueId);
+    return { ok: true };
+  });
+
+export const deleteBonusRule = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ leagueId: z.string().uuid(), id: z.string().uuid() }))
+  .handler(async ({ context, data }) => {
+    const admin = await ctx();
+    const { assertLeagueAccess } = await import("./authz.server");
+    await assertLeagueAccess(admin, context.userId, data.leagueId);
+    const { error } = await admin
+      .from("bonus_rules")
+      .delete()
+      .eq("id", data.id)
+      .eq("league_id", data.leagueId);
+    if (error) throw new Error(error.message);
+    const { recomputeLeague, rebuildLeaderboard } = await import("./scoring-engine.server");
+    await recomputeLeague(admin, data.leagueId);
+    await rebuildLeaderboard(admin, data.leagueId);
+    return { ok: true };
+  });
+
+export const clearBonusRules = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ leagueId: z.string().uuid() }))
+  .handler(async ({ context, data }) => {
+    const admin = await ctx();
+    const { assertLeagueAccess } = await import("./authz.server");
+    await assertLeagueAccess(admin, context.userId, data.leagueId);
+    const { error } = await admin.from("bonus_rules").delete().eq("league_id", data.leagueId);
+    if (error) throw new Error(error.message);
+    const { recomputeLeague, rebuildLeaderboard } = await import("./scoring-engine.server");
+    await recomputeLeague(admin, data.leagueId);
+    await rebuildLeaderboard(admin, data.leagueId);
+    return { ok: true };
+  });
