@@ -607,6 +607,261 @@ function ImportMatchesModal({ baseTournamentId }: { baseTournamentId: string }) 
   );
 }
 
+function EditTournamentModal({ tournament }: { tournament: any }) {
+  const qc = useQueryClient();
+  const update = useServerFn(ownerUpdateBaseTournament);
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    name: tournament.name ?? "",
+    description: tournament.description ?? "",
+    season: tournament.season ?? "",
+    sport_type: tournament.sport_type ?? "football",
+    status: tournament.status ?? "draft",
+    starts_at: tournament.starts_at ?? "",
+    default_exact_points: String(tournament.default_exact_points ?? 3),
+    default_tendency_points: String(tournament.default_tendency_points ?? 1),
+    default_incorrect_points: String(tournament.default_incorrect_points ?? 0),
+  });
+
+  const save = useMutation({
+    mutationFn: () =>
+      update({
+        data: {
+          id: tournament.id,
+          name: form.name,
+          description: form.description || null,
+          season: form.season || null,
+          sport_type: form.sport_type,
+          status: form.status as any,
+          starts_at: form.starts_at || null,
+          default_exact_points: Number(form.default_exact_points) || 0,
+          default_tendency_points: Number(form.default_tendency_points) || 0,
+          default_incorrect_points: Number(form.default_incorrect_points) || 0,
+        },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["owner-bases"] });
+      toast.success("Tournament updated");
+      setOpen(false);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+  });
+
+  function set(k: string, v: string) {
+    setForm((f) => ({ ...f, [k]: v }));
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Pencil className="mr-1 h-4 w-4" /> Edit
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Edit tournament</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-3">
+          <div className="grid gap-1.5">
+            <Label>Name</Label>
+            <Input value={form.name} onChange={(e) => set("name", e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Description</Label>
+            <Textarea
+              rows={2}
+              value={form.description}
+              onChange={(e) => set("description", e.target.value)}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label>Season</Label>
+              <Input value={form.season} onChange={(e) => set("season", e.target.value)} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Sport type</Label>
+              <Input
+                value={form.sport_type}
+                onChange={(e) => set("sport_type", e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label>Status</Label>
+              <Select value={form.status} onValueChange={(v) => set("status", v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="draft">draft</SelectItem>
+                  <SelectItem value="active">active</SelectItem>
+                  <SelectItem value="archived">archived</SelectItem>
+                  <SelectItem value="published">published</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Starts at (ISO)</Label>
+              <Input
+                value={form.starts_at}
+                onChange={(e) => set("starts_at", e.target.value)}
+                placeholder="2026-06-11T16:00:00Z"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="grid gap-1.5">
+              <Label>Exact pts</Label>
+              <Input
+                type="number"
+                value={form.default_exact_points}
+                onChange={(e) => set("default_exact_points", e.target.value)}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Tendency pts</Label>
+              <Input
+                type="number"
+                value={form.default_tendency_points}
+                onChange={(e) => set("default_tendency_points", e.target.value)}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Incorrect pts</Label>
+              <Input
+                type="number"
+                value={form.default_incorrect_points}
+                onChange={(e) => set("default_incorrect_points", e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button onClick={() => save.mutate()} disabled={save.isPending || !form.name}>
+            {save.isPending && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+            Save changes
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeleteTournamentButton({ tournament }: { tournament: any }) {
+  const qc = useQueryClient();
+  const del = useServerFn(ownerDeleteBaseTournament);
+  const remove = useMutation({
+    mutationFn: () => del({ data: { id: tournament.id } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["owner-bases"] });
+      toast.success("Tournament deleted");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+  });
+
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button variant="outline" size="sm" className="text-destructive">
+          <Trash2 className="mr-1 h-4 w-4" /> Delete
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete {tournament.name}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This can only be done if no leagues use this tournament. This cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={() => remove.mutate()}>Delete</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function OwnerAllLeaguesPanel() {
+  const qc = useQueryClient();
+  const list = useServerFn(ownerListAllLeagues);
+  const del = useServerFn(deleteLeague);
+  const { data } = useQuery({
+    queryKey: ["owner-all-leagues"],
+    queryFn: () => list(),
+  });
+
+  const remove = useMutation({
+    mutationFn: (leagueId: string) => del({ data: { leagueId } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["owner-all-leagues"] });
+      qc.invalidateQueries({ queryKey: ["my-leagues"] });
+      toast.success("League deleted");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+  });
+
+  const rows = data ?? [];
+
+  return (
+    <div>
+      <h3 className="mb-3 font-display text-lg font-bold">All leagues (owner)</h3>
+      {rows.length === 0 ? (
+        <Empty icon={Users} text="No leagues exist yet." />
+      ) : (
+        <Card className="glass-card overflow-x-auto p-0">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-xs text-muted-foreground">
+                <th className="px-3 py-2">League</th>
+                <th className="px-3 py-2">Manager</th>
+                <th className="px-3 py-2">Tournament</th>
+                <th className="px-3 py-2 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((l: any) => (
+                <tr key={l.id} className="border-b last:border-0">
+                  <td className="px-3 py-2 font-medium">{l.name}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{l.managerName}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{l.baseTournamentName}</td>
+                  <td className="px-3 py-2 text-right">
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="text-destructive">
+                          <Trash2 className="mr-1 h-4 w-4" /> Delete
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete {l.name}?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This cannot be undone. All related data will be removed.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => remove.mutate(l.id)}>
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+
 const EMPTY_THEME = {
   name: "",
   sport_type: "football",
