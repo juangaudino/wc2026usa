@@ -1,155 +1,180 @@
-// Server-only scoring orchestration. Recomputes points after results change
-// and rebuilds leaderboard snapshots. Deterministic and auditable.
-import { scorePrediction, scoreBonus, type ScoringConfig, type BonusField } from "@/lib/scoring";
+// League-aware scoring engine. Pure DB orchestration around the pure scoring
+// rules in src/lib/scoring.ts. Recomputes per private league.
+import { scorePrediction } from "@/lib/scoring";
 
-type Admin = typeof import("@/integrations/supabase/client.server").supabaseAdmin;
+type Admin = any;
 
-async function getScoringConfig(admin: Admin, tournamentId: string): Promise<ScoringConfig> {
-  const { data: t } = await admin
-    .from("tournaments")
-    .select("scoring_rules_id")
-    .eq("id", tournamentId)
+async function leagueScoring(admin: Admin, leagueId: string) {
+  const { data } = await admin
+    .from("scoring_rules")
+    .select("exact_score_points, tendency_points, incorrect_points")
+    .eq("league_id", leagueId)
     .maybeSingle();
-  if (t?.scoring_rules_id) {
-    const { data: r } = await admin
-      .from("scoring_rules")
-      .select("exact_score_points, tendency_points, incorrect_points")
-      .eq("id", t.scoring_rules_id)
-      .maybeSingle();
-    if (r) {
-      return {
-        exactScorePoints: r.exact_score_points,
-        tendencyPoints: r.tendency_points,
-        incorrectPoints: r.incorrect_points,
-      };
-    }
-  }
-  return { exactScorePoints: 3, tendencyPoints: 1, incorrectPoints: 0 };
+  return {
+    exactScorePoints: data?.exact_score_points ?? 3,
+    tendencyPoints: data?.tendency_points ?? 1,
+    incorrectPoints: data?.incorrect_points ?? 0,
+  };
 }
 
-// Recompute all match prediction points for a single match.
-export async function recomputeMatch(admin: Admin, matchId: string) {
-  const { data: match } = await admin
+async function resultsForLeague(admin: Admin, baseTournamentId: string) {
+  const { data: matches } = await admin
     .from("matches")
-    .select("id, tournament_id")
-    .eq("id", matchId)
-    .maybeSingle();
-  if (!match) return;
+    .select("id")
+    .eq("base_tournament_id", baseTournamentId);
+  const ids = (matches ?? []).map((m: any) => m.id);
+  if (!ids.length) return new Map<string, { home: number; away: number }>();
+  const { data: results } = await admin
+    .from("match_results")
+    .select("match_id, home_score, away_score")
+    .in("match_id", ids);
+  const map = new Map<string, { home: number; away: number }>();
+  for (const r of results ?? [])
+    map.set(r.match_id, { home: r.home_score, away: r.away_score });
+  return map;
+}
 
-  const { data: result } = await admin
-    .from("results")
-    .select("home_score, away_score")
-    .eq("match_id", matchId)
+/** Recompute every match + bonus prediction's points for one league. */
+export async function recomputeLeague(admin: Admin, leagueId: string) {
+  const { data: league } = await admin
+    .from("private_leagues")
+    .select("base_tournament_id")
+    .eq("id", leagueId)
     .maybeSingle();
-  if (!result) return;
+  if (!league) return;
 
-  const cfg = await getScoringConfig(admin, match.tournament_id);
+  const cfg = await leagueScoring(admin, leagueId);
+  const results = await resultsForLeague(admin, league.base_tournament_id);
+
   const { data: preds } = await admin
     .from("match_predictions")
-    .select("id, home_score, away_score")
-    .eq("match_id", matchId);
-
+    .select("id, match_id, home_score, away_score, points")
+    .eq("league_id", leagueId);
   for (const p of preds ?? []) {
-    const { points } = scorePrediction(
-      p.home_score,
-      p.away_score,
-      result.home_score,
-      result.away_score,
-      cfg,
-    );
-    await admin.from("match_predictions").update({ points }).eq("id", p.id);
+    const r = results.get(p.match_id);
+    const pts = r
+      ? scorePrediction(p.home_score, p.away_score, r.home, r.away, cfg).points
+      : 0;
+    if (pts !== p.points)
+      await admin.from("match_predictions").update({ points: pts }).eq("id", p.id);
   }
-}
 
-// Recompute bonus prediction points for a tournament using bonus_config.
-export async function recomputeBonus(admin: Admin, tournamentId: string) {
-  const { data: t } = await admin
-    .from("tournaments")
-    .select("bonus_config")
-    .eq("id", tournamentId)
-    .maybeSingle();
-  const fields = (t?.bonus_config ?? []) as unknown as BonusField[];
-  const byKey = new Map(fields.map((f) => [f.key, f]));
-
-  const { data: preds } = await admin
+  // Bonus
+  const { data: rules } = await admin
+    .from("bonus_rules")
+    .select("bonus_key, points, correct_value")
+    .eq("league_id", leagueId);
+  const ruleMap = new Map((rules ?? []).map((r: any) => [r.bonus_key, r]));
+  const { data: bpreds } = await admin
     .from("bonus_predictions")
-    .select("id, bonus_key, value")
-    .eq("tournament_id", tournamentId);
-
-  for (const p of preds ?? []) {
-    const field = byKey.get(p.bonus_key);
-    const points = field ? scoreBonus(p.value, field) : 0;
-    await admin.from("bonus_predictions").update({ points }).eq("id", p.id);
+    .select("id, bonus_key, value, points")
+    .eq("league_id", leagueId);
+  for (const b of bpreds ?? []) {
+    const rule: any = ruleMap.get(b.bonus_key);
+    let pts = 0;
+    if (rule?.correct_value && b.value)
+      pts =
+        b.value.trim().toLowerCase() === rule.correct_value.trim().toLowerCase()
+          ? rule.points
+          : 0;
+    if (pts !== b.points)
+      await admin.from("bonus_predictions").update({ points: pts }).eq("id", b.id);
   }
 }
 
 export interface LeaderboardRow {
   participantId: string;
   name: string;
-  matchPoints: number;
-  bonusPoints: number;
-  total: number;
-  exactCount: number;
-  predictionCount: number;
+  points: number;
+  exact: number;
+  tendency: number;
+  played: number;
   rank: number;
 }
 
-// Build leaderboard from current points, store a snapshot for rank movement.
-export async function rebuildLeaderboard(admin: Admin, tournamentId: string): Promise<LeaderboardRow[]> {
+/** Rebuild the leaderboard for a league, snapshot it, and return the rows. */
+export async function rebuildLeaderboard(
+  admin: Admin,
+  leagueId: string,
+): Promise<LeaderboardRow[]> {
+  const { data: league } = await admin
+    .from("private_leagues")
+    .select("base_tournament_id")
+    .eq("id", leagueId)
+    .maybeSingle();
+  if (!league) return [];
+
+  const results = await resultsForLeague(admin, league.base_tournament_id);
+  const cfg = await leagueScoring(admin, leagueId);
+
   const { data: participants } = await admin
-    .from("participants")
+    .from("league_participants")
     .select("id, name")
-    .eq("tournament_id", tournamentId);
-
-  const { data: matches } = await admin
-    .from("matches")
-    .select("id")
-    .eq("tournament_id", tournamentId);
-  const matchIds = (matches ?? []).map((m) => m.id);
-
-  const { data: mpreds } = matchIds.length
-    ? await admin
-        .from("match_predictions")
-        .select("participant_id, points, home_score, away_score, match_id")
-        .in("match_id", matchIds)
-    : { data: [] as any[] };
-
-  // exact = points === 3-ish; instead recompute exact flag from results
-  const { data: results } = matchIds.length
-    ? await admin.from("results").select("match_id, home_score, away_score").in("match_id", matchIds)
-    : { data: [] as any[] };
-  const resultMap = new Map((results ?? []).map((r) => [r.match_id, r]));
-
+    .eq("league_id", leagueId);
+  const { data: preds } = await admin
+    .from("match_predictions")
+    .select("participant_id, match_id, home_score, away_score, points")
+    .eq("league_id", leagueId);
   const { data: bpreds } = await admin
     .from("bonus_predictions")
     .select("participant_id, points")
-    .eq("tournament_id", tournamentId);
+    .eq("league_id", leagueId);
 
-  const rows = (participants ?? []).map((p) => {
-    const mine = (mpreds ?? []).filter((m) => m.participant_id === p.id);
-    const matchPoints = mine.reduce((s, m) => s + (m.points ?? 0), 0);
-    const exactCount = mine.filter((m) => {
-      const r = resultMap.get(m.match_id);
-      return r && r.home_score === m.home_score && r.away_score === m.away_score;
-    }).length;
-    const bonusPoints = (bpreds ?? [])
-      .filter((b) => b.participant_id === p.id)
-      .reduce((s, b) => s + (b.points ?? 0), 0);
-    return {
+  const agg = new Map<string, LeaderboardRow>();
+  for (const p of participants ?? [])
+    agg.set(p.id, {
       participantId: p.id,
       name: p.name,
-      matchPoints,
-      bonusPoints,
-      total: matchPoints + bonusPoints,
-      exactCount,
-      predictionCount: mine.length,
+      points: 0,
+      exact: 0,
+      tendency: 0,
+      played: 0,
       rank: 0,
-    };
-  });
+    });
 
-  rows.sort((a, b) => b.total - a.total || b.exactCount - a.exactCount || a.name.localeCompare(b.name));
+  for (const p of preds ?? []) {
+    const row = agg.get(p.participant_id);
+    if (!row) continue;
+    row.points += p.points ?? 0;
+    const r = results.get(p.match_id);
+    if (r) {
+      row.played++;
+      const sb = scorePrediction(p.home_score, p.away_score, r.home, r.away, cfg);
+      if (sb.outcome === "exact") row.exact++;
+      else if (sb.outcome === "tendency") row.tendency++;
+    }
+  }
+  for (const b of bpreds ?? []) {
+    const row = agg.get(b.participant_id);
+    if (row) row.points += b.points ?? 0;
+  }
+
+  const rows = [...agg.values()].sort(
+    (a, b) => b.points - a.points || a.name.localeCompare(b.name),
+  );
   rows.forEach((r, i) => (r.rank = i + 1));
 
-  await admin.from("leaderboard_snapshots").insert({ tournament_id: tournamentId, data: rows as any });
+  await admin.from("leaderboard_snapshots").insert({ league_id: leagueId, data: rows });
+  // Prune to the last 12 snapshots.
+  const { data: snaps } = await admin
+    .from("leaderboard_snapshots")
+    .select("id")
+    .eq("league_id", leagueId)
+    .order("created_at", { ascending: false });
+  const stale = (snaps ?? []).slice(12).map((s: any) => s.id);
+  if (stale.length) await admin.from("leaderboard_snapshots").delete().in("id", stale);
+
   return rows;
+}
+
+/** Recompute every league built on a base tournament (e.g. after a result). */
+export async function recomputeBaseTournament(admin: Admin, baseTournamentId: string) {
+  const { data: leagues } = await admin
+    .from("private_leagues")
+    .select("id")
+    .eq("base_tournament_id", baseTournamentId);
+  for (const l of leagues ?? []) {
+    await recomputeLeague(admin, l.id);
+    await rebuildLeaderboard(admin, l.id);
+  }
 }
