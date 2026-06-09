@@ -344,6 +344,7 @@ export const getLeagueManage = createServerFn({ method: "POST" })
       .select("*")
       .eq("id", (league as any).base_tournament_id)
       .maybeSingle();
+    if (!base) throw new Error("Tournament not found.");
     const [participants, teams, matches, bonusRules, scoring] = await Promise.all([
       admin.from("league_participants").select("*").eq("league_id", league.id),
       admin.from("teams").select("*").eq("base_tournament_id", base.id),
