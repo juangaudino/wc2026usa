@@ -117,21 +117,15 @@ function PlayerBoard() {
             <TabsTrigger value="tournament">Tournament</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="matches" className="mt-4 space-y-3">
-            {(data.matches as any[]).length === 0 && (
-              <p className="text-sm text-muted-foreground">No matches scheduled yet.</p>
-            )}
-            {(data.matches as any[]).map((m) => (
-              <MatchPredictionCard
-                key={m.id}
-                token={token}
-                match={m}
-                tm={tm}
-                locked={isLocked(league, m)}
-                prediction={predByMatch.get(m.id)}
-                result={resByMatch.get(m.id)}
-              />
-            ))}
+          <TabsContent value="matches" className="mt-4">
+            <MatchesPanel
+              token={token}
+              matches={data.matches as any[]}
+              tm={tm}
+              league={league}
+              predByMatch={predByMatch}
+              resByMatch={resByMatch}
+            />
           </TabsContent>
 
           {bonusConfig.length > 0 && (
